@@ -245,3 +245,201 @@ Example test_blt_nat2: (blt_nat 2 4) = true.
 Proof. simpl. reflexivity. Qed.
 Example test_blt_nat3: (blt_nat 4 2) = false.
 Proof. simpl. reflexivity. Qed.
+
+(* Proof by Simplification *)
+
+Theorem plus_0_n : forall n : nat, 0 + n = n.
+Proof.
+  intros n. simpl. reflexivity. Qed.
+
+Theorem plus_1_n : forall n : nat, 1 + n = S n.
+Proof.
+  intros n. reflexivity. Qed.
+
+Theorem mult_0_1 : forall n : nat, 0 * n = 0.
+Proof.
+  intros n. reflexivity. Qed.
+
+Theorem plus_n_0 : forall n, n = n + 0.
+Proof.
+  intros n. simpl.
+
+Abort.
+
+(* This failed because `plus` can't handle undeterministic n as first argument *)
+
+(* Proof by rewriting *)
+
+Theorem plus_id_example : forall n m:nat,
+  n = m ->
+  n + n = m + m.
+Proof.
+  (* move both quantifiers into the context : *)
+  intros n m.
+  (* move the hypothesis into the context : *)
+  intros H.
+  (* rewrite the goal using the hypothesis: *)
+  rewrite -> H.
+  reflexivity. Qed.
+
+(* Exc plus id *)
+Theorem plus_id_excercise : forall n m o : nat,
+  n = m -> m = o -> n + m = m + o.
+Proof.
+  intros n m o.
+  intros H.
+  intros H'.
+  rewrite -> H.
+  rewrite -> H'.
+  reflexivity. Qed.
+
+Theorem mult_0_plus : forall n m : nat,
+  (0 + n) * m = n * m.
+Proof.
+  intros n m.
+  rewrite -> plus_0_n.
+  reflexivity. Qed.
+
+(* Exc mult S 1 *)
+Theorem mult_S_1 : forall n m : nat,
+  m = S n ->
+  m * (1 + n) = m * m.
+Proof.
+  intros n m.
+  intros H.
+  rewrite -> H.
+  rewrite <- plus_1_n.
+  reflexivity. Qed.
+
+(* Proof by Case Analysis *)
+Theorem plus_1_neg_0_firsttry : forall n: nat,
+  beq_nat (n + 1) 0 = false.
+Proof.
+  intros n.
+  simpl.
+Abort.
+
+Theorem plus_1_neg_0 : forall n : nat,
+  beq_nat (n + 1) 0 = false.
+Proof.
+  intros n. destruct n as [| n'].
+  - reflexivity.
+  - reflexivity. Qed.
+
+Theorem negb_involutive : forall b : bool,
+  negb (negb b) = b.
+Proof.
+  intros b. destruct b.
+  - reflexivity.
+  - reflexivity. Qed.
+
+Theorem andb_commutative : forall b c, andb b c = andb c b.
+Proof.
+  intros b c. destruct b.
+  - destruct c.
+    + reflexivity.
+    + reflexivity.
+  - destruct c.
+    + reflexivity.
+    + reflexivity.
+  Qed.
+
+(* Exc andb_true_elem2 *)
+Theorem andb_true_elim2 : forall b c : bool,
+  andb b c = true -> c = true.
+Proof.
+  intros b c H.
+  destruct c.
+  - reflexivity.
+  - rewrite <-H.
+    destruct b.
+    + reflexivity.
+    + reflexivity.
+  Qed.
+
+Theorem zero_nbeq_plus_1 : forall n : nat,
+  beq_nat 0 (n + 1) = false.
+Proof.
+  intros [|n'].
+  - reflexivity.
+  - simpl. reflexivity.
+  Qed.
+
+Theorem identity_fn_applies_twice :
+  forall (f: bool -> bool),
+  (forall(x : bool), f x = x) ->
+  forall (b: bool), f (f b) = b.
+Proof.
+  intros f H.
+  intros x.
+  rewrite -> H.
+  rewrite -> H.
+  reflexivity.
+  Qed.
+
+Lemma true_andb : forall b :bool,
+  andb true b = b.
+Proof.
+  intros b. reflexivity. Qed.
+
+Lemma true_orb : forall b :bool,
+  orb true b = true.
+Proof.
+  intros b. reflexivity. Qed.
+
+Lemma false_andb : forall c :bool,
+  andb false c = false.
+Proof.
+  intros b. reflexivity. Qed.
+
+Lemma false_orb : forall c :bool,
+  orb false c = c.
+Proof.
+  intros b. reflexivity. Qed.
+
+Theorem andb_eq_orb :
+  forall (b c: bool),
+  (andb b c = orb b c) ->
+  b = c.
+Proof.
+  intros b c H.
+  destruct b.
+  - rewrite <- true_andb. 
+    rewrite -> H.
+    rewrite -> true_orb.
+    reflexivity.
+  - rewrite <- false_orb.
+    rewrite <- H.
+    rewrite -> false_andb.
+    reflexivity.
+  Qed.
+
+
+Inductive bin : Type :=
+  | Zero : bin
+  | Twice : bin -> bin
+  | TwiceAndOne : bin -> bin.
+
+Fixpoint incr (b : bin) : bin :=
+  match b with
+    | Zero => TwiceAndOne Zero
+    | Twice b' => TwiceAndOne b'
+    | TwiceAndOne b' => Twice (incr b')
+  end.
+
+Fixpoint bin_to_nat (b : bin) : nat :=
+  match b with
+    | Zero => 0
+    | TwiceAndOne b' => 1 + 2 * (bin_to_nat b')
+    | Twice b' => 2 * (bin_to_nat b')
+  end.
+
+Theorem bin_to_nat_identical:
+  forall b: bin,
+  bin_to_nat (incr b) = 1 + (bin_to_nat b).
+Proof.
+  intros [|b1|b2].
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  (* Can't solve this for now! *)
+  - Admitted.
