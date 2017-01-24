@@ -50,3 +50,28 @@ Proof.
   - simpl. reflexivity.
   - simpl. rewrite -> IHn'. reflexivity. Qed.
 
+(* Temporary introduce even b as Require Export doesn't work for me *)
+Fixpoint evenb (n:nat) : bool :=
+  match n with
+    | O => true
+    | S O => false
+    | S (S n') => evenb n'
+  end.
+
+Lemma neg_neg_lemma : forall n : bool,
+  n = negb (negb n).
+Proof.
+  intros [].
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  Qed.
+
+
+Theorem evenb_S : forall n : nat,
+  evenb (S n) = negb (evenb n).
+Proof.
+  intros [|m].
+  - simpl. reflexivity.
+  - simpl. induction m as [|m' IHm'].
+    + simpl. reflexivity.
+    + simpl. rewrite -> IHm'. rewrite <- neg_neg_lemma. reflexivity. Qed.
