@@ -145,3 +145,13 @@ Proof.
   - simpl. reflexivity.
   - simpl. rewrite -> IHn'. reflexivity. Qed.
 
+Theorem bin_to_nat_pres_incr:
+  forall b: bin,
+  bin_to_nat (incr b) = 1 + (bin_to_nat b).
+Proof.
+  intros b. induction b as [|b1 IHb1|b2 IHb2].
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+  - simpl. rewrite -> IHb2. rewrite <- plus_n_O. rewrite -> plus_assoc.
+    rewrite -> plus_n_Sm. rewrite <- plus_n_O. simpl. rewrite <- plus_assoc. simpl.
+    reflexivity. Qed.

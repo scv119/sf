@@ -433,13 +433,3 @@ Fixpoint bin_to_nat (b : bin) : nat :=
     | TwiceAndOne b' => 1 + 2 * (bin_to_nat b')
     | Twice b' => 2 * (bin_to_nat b')
   end.
-
-Theorem bin_to_nat_identical:
-  forall b: bin,
-  bin_to_nat (incr b) = 1 + (bin_to_nat b).
-Proof.
-  intros [|b1|b2].
-  - simpl. reflexivity.
-  - simpl. reflexivity.
-  (* Can't solve this for now! *)
-  - Admitted.
