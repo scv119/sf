@@ -155,3 +155,29 @@ Proof.
   - simpl. rewrite -> IHb2. rewrite <- plus_n_O. rewrite -> plus_assoc.
     rewrite -> plus_n_Sm. rewrite <- plus_n_O. simpl. rewrite <- plus_assoc. simpl.
     reflexivity. Qed.
+
+Fixpoint nat_to_bin (n: nat): bin :=
+  match n with 
+    | O => Zero
+    | S n' => incr (nat_to_bin n')
+  end.
+
+Theorem nat_to_bin_to_nat : forall n : nat,
+  bin_to_nat (nat_to_bin n) = n.
+Proof.
+  intros n. induction n as [|n' IHn'].
+  - simpl. reflexivity.
+  - simpl. rewrite -> bin_to_nat_pres_incr. rewrite -> IHn'. simpl. reflexivity.
+  Qed.
+
+(* bin to nat to bin is not true as for same nat there might be more than one presentation:
+
+    0 =  Zero = Twice Zero
+*)
+
+Definition normalize (n : bin): bin := nat_to_bin(bin_to_nat n).
+
+Theorem bin_to_nat_to_bin : forall b : bin,
+  nat_to_bin(bin_to_nat b) = normalize b.
+Proof.
+  intros b. simpl. reflexivity. Qed.
