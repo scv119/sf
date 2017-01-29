@@ -460,3 +460,52 @@ Proof.
   - reflexivity. Qed.
 
 End NatList.
+
+
+Inductive id : Type :=
+  | Id : nat -> id.
+
+Definition beq_id x1 x2 :=
+  match x1, x2 with
+  | Id n1, Id n2 => beq_nat n1 n2
+  end.
+
+Theorem beq_id_refl : forall x, true = beq_id x x.
+Proof. intros [x']. simpl. Admitted.
+
+Module PartialMap.
+Import NatList.
+
+Inductive partial_map : Type :=
+  | empty : partial_map
+  | record : id -> nat -> partial_map -> partial_map.
+
+Definition update (d: partial_map) (key: id) (value : nat) : partial_map :=
+  record key value d.
+
+Fixpoint find (key : id) (d : partial_map) : natoption :=
+  match d with
+  | empty => None
+  | record k v d' => if beq_id key k 
+                     then Some v
+                     else find key d'
+  end.
+
+Theorem update_eq: forall (d: partial_map) (k : id) (v: nat),
+  find k (update d k v) = Some v.
+Proof.
+  intros d k v. simpl. rewrite <- beq_id_refl. reflexivity. Qed.
+
+Theorem update_neq : forall (d: partial_map) (n m : id) (o : nat),
+  beq_id m n = false -> find m (update d n o) = find m d.
+Proof.
+  intros d n m o H. simpl. rewrite -> H. reflexivity. Qed.
+
+End PartialMap.
+
+
+Inductive baz : Type :=
+  | Baz1 : baz → baz
+  | Baz2 : baz → bool → baz.
+
+(* Infinite as it could be (baz, baz->true, baz->false, baz->true->false ... *)
