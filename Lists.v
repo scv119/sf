@@ -503,9 +503,9 @@ Proof.
 
 End PartialMap.
 
-
+(*
 Inductive baz : Type :=
   | Baz1 : baz → baz
   | Baz2 : baz → bool → baz.
 
-(* Infinite as it could be (baz, baz->true, baz->false, baz->true->false ... *)
+ Infinite as it could be (baz, baz->true, baz->false, baz->true->false ... *)
