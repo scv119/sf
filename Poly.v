@@ -193,3 +193,66 @@ Example test_hd_error1 : hd_error [1;2] = Some 1.
 Proof. reflexivity. Qed.
 Example test_hd_error2 : hd_error [[1];[2]] = Some [1].
 Proof. reflexivity. Qed.
+
+Definition doit3times {X : Type} (f : X -> X ) (n : X) : X :=
+  f (f (f n)).
+
+Check @doit3times.
+
+Example test_doit3times: doit3times minustwo 9 = 3.
+Proof. reflexivity. Qed.
+
+Fixpoint filter {X : Type} (test: X -> bool) (l : list X) : (list X) :=
+  match l with
+  | [] => []
+  | h :: t => if test h then h :: (filter test t) else filter test t
+  end.
+
+
+Example test_filter1: filter evenb [1;2;3;4] = [2;4].
+Proof. reflexivity. Qed.
+
+Definition length_is_1 {X : Type} (l : list X) : bool :=
+  beq_nat (length l) 1.
+
+Example test_filter2:
+    filter length_is_1
+           [ [1; 2]; [3]; [4]; [5;6;7]; []; [8] ]
+  = [ [3]; [4]; [8] ].
+Proof. reflexivity. Qed.
+
+Definition countoddmembers' (l:list nat) : nat :=
+  length (filter oddb l).
+
+Example test_countoddmembers'1: countoddmembers' [1;0;3;1;4;5] = 4.
+Proof. reflexivity. Qed.
+Example test_countoddmembers'2: countoddmembers' [0;2;4] = 0.
+Proof. reflexivity. Qed.
+Example test_countoddmembers'3: countoddmembers' nil = 0.
+Proof. reflexivity. Qed.
+
+Example test_annon_fun':
+  doit3times (fun n => n * n) 2 = 256.
+Proof. reflexivity. Qed.
+
+Definition filter_even_gt7 (l : list nat) : list nat :=
+  filter (fun n => andb (evenb n) (leb 8 n)) l.
+
+Example test_filter_even_gt7_1 :
+  filter_even_gt7 [1;2;6;9;10;3;12;8] = [10;12;8].
+Proof. reflexivity. Qed.
+
+Example test_filter_even_gt7_2 :
+  filter_even_gt7 [5;2;6;19;129] = [].
+Proof. reflexivity. Qed.
+
+Definition compose' {A B C} (g : B -> C) (f : A -> B) :=
+  fun x : A => g (f x).
+
+Definition partition {X: Type} (test : X -> bool) (l : list X) : list X * list X :=
+  (filter test l, filter (compose' negb test) l).
+
+Example test_partition1: partition oddb [1;2;3;4;5] = ([1;3;5], [2;4]).
+Proof. reflexivity. Qed.
+Example test_partition2: partition (fun x => false) [5;9;0] = ([], [5;9;0]).
+Proof. reflexivity. Qed.
