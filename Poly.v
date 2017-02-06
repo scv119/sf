@@ -1,4 +1,4 @@
-+Add LoadPath "/Users/chenshen/src/sf/".
+Add LoadPath "/Users/chenshen/src/sf/".
 Require Export Lists.
 
 Inductive boollist : Type :=
@@ -117,6 +117,22 @@ Proof.
   intros X l1 l2. induction l1 as [|x l1' IHl1'].
   - reflexivity.
   - simpl. rewrite -> IHl1'. reflexivity. Qed.
+
+
+Theorem rev_swap : forall (X : Type) (l1 l2 : list X),
+  rev(l1 ++ l2) = (rev l2) ++ (rev l1).
+Proof.
+  intros X l1 l2. induction l1 as [|n l1' IHl1'].
+  - simpl. rewrite -> app_nil_r. reflexivity.
+  - simpl. rewrite -> IHl1', app_assoc. reflexivity. Qed.
+
+
+Theorem rev_involutive: forall (X : Type) (l : list X),
+  rev(rev l) = l.
+Proof.
+  intros X l. induction l as [|n l1 IHl1'].
+  - reflexivity.
+  - simpl. rewrite -> rev_swap. rewrite -> IHl1'. reflexivity. Qed.
 
 Inductive prod (X Y : Type) : Type :=
 | pair : X -> Y -> prod X Y.
@@ -406,7 +422,7 @@ Proof. reflexivity. Qed.
 
 (* By observate that 
 
-(multi m m) f = m (m f)
+(multi m m) f x = m (m f) x
 
 we could see 
 
