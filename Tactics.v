@@ -408,3 +408,61 @@ Proof.
     + rewrite -> Heq2. rewrite -> Heq2. reflexivity.
 Qed.
 
+SearchAbout beq_nat_true.
+
+Theorem beq_nat_sym : forall(n m : nat),
+  beq_nat n m = beq_nat m n.
+Proof.
+  intros n. induction n as [|n'].
+  - intros m. destruct m.
+    + reflexivity.
+    + reflexivity.
+  - intros m. destruct m.
+    + reflexivity.
+    + simpl. apply IHn'.
+Qed.
+
+Theorem beq_nat_trans : forall n m p,
+  beq_nat n m = true ->
+  beq_nat m p = true ->
+  beq_nat n p = true.
+Proof.
+  intros n m p eq1 eq2.
+  apply beq_nat_true in eq1. apply beq_nat_true in eq2. rewrite eq1. rewrite eq2. 
+  assert (eq3: forall r, beq_nat r r = true).
+  {
+      intros r. induction r as [|r' IHr'].
+      - reflexivity.
+      - simpl. apply IHr'.
+  } 
+  apply eq3.
+Qed.
+
+Definition split_combine_statement : Prop :=
+  forall X Y (l : list (X * Y)) l1 l2,
+  combine l1 l2 = l ->
+  length l1 = length l ->
+  length l2 = length l ->
+  split l = (l1, l2).
+
+Theorem split_combine : split_combine_statement.
+Proof.
+  intros X Y l.
+  induction l as [|n l' IHl'].
+  - intros l1 l2 eq1 eq2 eq3. inversion eq2. destruct l1 as [|n l1'].
+    + inversion eq3. destruct l2 as [|m l2'].
+      * reflexivity.
+      * inversion H1.
+    + inversion H0.
+  - intros l1 l2 eq1 eq2 eq3. destruct l1 as [|m l1'].
+    + inversion eq2.
+    + destruct l2 as [|o l2'].
+      * inversion eq3.
+      * inversion eq2. inversion eq3. simpl in eq1. inversion eq1. 
+        simpl. rewrite -> H3. destruct (split l').
+        assert (H4: (l, l0) = (l1', l2') -> (m :: l, o :: l0) = (m :: l1', o :: l2')).
+        { intros H5. inversion H5. rewrite <- H4. rewrite <- H6. reflexivity. }
+        apply H4. apply IHl'. apply H3. apply H0. apply H1.
+Qed.
+
+
