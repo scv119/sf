@@ -290,3 +290,121 @@ Proof.
   - induction n as [|n'].
     + apply H1 in IHm'. apply IHm'.
     + apply H3. apply IHm'. Qed.
+
+Definition square n := n * n.
+Lemma suqare_mult : forall n m, square (n * m) = square n * square m.
+Proof. intros n m.
+  simpl. unfold square. rewrite mult_assoc. 
+  assert (H : n * m * n = n * n * m).
+  { rewrite mult_comm. apply mult_assoc. }
+  rewrite H. rewrite mult_assoc. reflexivity.
+  Qed.
+
+Definition foo (x: nat) := 5.
+
+Fact silly_fact_1 : forall m, foo m + 1 = foo (m + 1) + 1.
+Proof.
+  intros m.
+  simpl.
+  reflexivity.
+Qed.
+
+Definition bar x :=
+  match x with
+  | O => 5
+  | S _ => 5
+  end.
+
+Fact silly_fact_2_FAILED : forall m, bar m + 1 = bar (m + 1) + 1.
+Proof.
+  intros m.
+  simpl. (* Does nothing! *)
+Abort.
+
+Fact silly_fact_2' : forall m, bar m + 1 = bar (m + 1) + 1.
+Proof.
+  intros m.
+  unfold bar.
+  destruct m.
+  - reflexivity.
+  - reflexivity.
+Qed.
+
+Definition sillyfun (n : nat) : bool :=
+  if beq_nat n 3 then false
+  else if beq_nat n 5 then false
+  else false.
+
+Theorem sillyfun_false : forall (n : nat),
+  sillyfun n = false.
+Proof.
+  intros n. unfold sillyfun.
+  destruct (beq_nat n 3).
+    - (* beq_nat n 3 = true *) reflexivity.
+    - (* beq_nat n 3 = false *) destruct (beq_nat n 5).
+      + (* beq_nat n 5 = true *) reflexivity.
+      + (* beq_nat n 5 = false *) reflexivity. Qed.
+
+
+Theorem combin_split : forall X Y (l : list (X * Y)) l1 l2,
+  split l = (l1, l2) ->
+  combine l1 l2 = l.
+Proof.
+  intros X Y l. induction l as [|n l' IHl'].
+  - intros l1 l2 H. inversion H. reflexivity.
+  - intros l1 l2 H. destruct l1.
+    + destruct n. simpl in H. destruct (split l'). inversion H.
+    + simpl in H. destruct n. destruct (split l'). destruct l2.
+      * inversion H.
+      * inversion H. simpl. apply f_equal. apply IHl'. rewrite  H2,H4. reflexivity. Qed.
+
+Definition sillyfun1 (n : nat) : bool :=
+  if beq_nat n 3 then true
+  else if beq_nat n 5 then true
+  else false.
+
+Theorem sillyfun1_odd_FAILED : forall (n : nat),
+     sillyfun1 n = true ->
+     oddb n = true.
+Proof.
+  intros n eq. unfold sillyfun1 in eq.
+  destruct (beq_nat n 3).
+  (* stuck... *)
+Abort.
+
+Theorem sillyfun1_odd : forall (n : nat),
+     sillyfun1 n = true ->
+     oddb n = true.
+Proof.
+  intros n eq. unfold sillyfun1 in eq.
+  destruct (beq_nat n 3) eqn:Heqe3.
+   - (* e3 = true *) apply beq_nat_true in Heqe3.
+      rewrite -> Heqe3. reflexivity.
+    - (* e3 = false *)
+     (* When we come to the second equality test in the body
+        of the function we are reasoning about, we can use
+        eqn: again in the same way, allow us to finish the
+        proof. *)
+      destruct (beq_nat n 5) eqn:Heqe5.
+        + (* e5 = true *)
+          apply beq_nat_true in Heqe5.
+          rewrite -> Heqe5. reflexivity.
+        + (* e5 = false *) inversion eq. Qed.
+
+Theorem bool_fn_applied_thrice :
+  forall (f : bool -> bool) (b : bool),
+  f (f (f b)) = f b.
+Proof.
+  intros f b. destruct b eqn: Heq1.
+  - destruct (f true) eqn: Heq2.
+    + rewrite -> Heq2. rewrite -> Heq2. reflexivity.
+    + destruct (f false) eqn: Heq3.
+      * apply Heq2.
+      * apply Heq3.
+  - destruct (f false) eqn: Heq2.
+    + destruct (f true) eqn : Heq3.
+      * apply Heq3.
+      * apply Heq2.
+    + rewrite -> Heq2. rewrite -> Heq2. reflexivity.
+Qed.
+
