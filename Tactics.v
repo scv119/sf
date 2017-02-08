@@ -465,4 +465,77 @@ Proof.
         apply H4. apply IHl'. apply H3. apply H0. apply H1.
 Qed.
 
+Theorem filter_excercise : forall (X: Type) (test : X -> bool)
+                            (x : X) (l lf : list X),
+  filter test l = x :: lf -> test x = true.
+Proof.
+  intros X test x l lf H. induction l as [|n l' IHl'].
+  - inversion H.
+  - simpl in H. destruct (test n) eqn: Heq.
+    + inversion H. rewrite <- H1. apply Heq.
+    + apply IHl' in H. apply H.
+Qed.
 
+Fixpoint forallb {X : Type} (f : X -> bool) (l : list X) : bool :=
+  match l with
+  | [] => true
+  | s :: t => andb (f s) (forallb f t)
+  end.
+
+Fixpoint existsb {X : Type} (f : X -> bool) (l : list X) : bool :=
+  match l with
+  | [] => false
+  | s :: t => orb (f s) (existsb f t)
+  end.
+
+Example forallb_test1 : forallb oddb [1;3;5;7;9] = true.
+Proof. reflexivity. Qed.
+
+Example forallb_test2 : forallb negb [false;false] = true.
+Proof. reflexivity. Qed.
+
+Example forallb_test3 : forallb evenb [0;2;4;5] = false.
+Proof. reflexivity. Qed.
+
+Example forallb_test4 : forallb (beq_nat 5) [] = true.
+Proof. reflexivity. Qed.
+
+Example existsb_test1 : existsb (beq_nat 5) [0;2;3;6] = false.
+Proof. reflexivity. Qed.
+
+Example existsb_test2 : existsb (andb true) [true;true;false] = true.
+Proof. reflexivity. Qed.
+
+Example existsb_test3 : existsb oddb [1;0;0;0;0;3] = true.
+Proof. reflexivity. Qed.
+
+Example existsb_test4 : existsb evenb [1] = false.
+Proof. simpl. reflexivity. Qed.
+
+Definition compose {A B C} (g : B -> C) (f : A -> B) :=
+  fun x : A => g (f x).
+
+Definition existsb' {X: Type} (f : X -> bool) (l : list X) : bool :=
+  negb(forallb (compose negb f) l).
+
+Example existsb_test1' : existsb' (beq_nat 5) [0;2;3;6] = false.
+Proof. reflexivity. Qed.
+
+Example existsb_test2' : existsb' (andb true) [true;true;false] = true.
+Proof. reflexivity. Qed.
+
+Example existsb_test3' : existsb' oddb [1;0;0;0;0;3] = true.
+Proof. reflexivity. Qed.
+
+Example existsb_test4' : existsb' evenb [1] = false.
+Proof. reflexivity. Qed.
+
+Theorem existsb_existsb': forall (X : Type) (f : X -> bool) (l : list X),
+  existsb f l = existsb' f l.
+Proof.
+  intros X f l. induction l as [|n l' IHl'].
+  - reflexivity.
+  - simpl.  unfold existsb'. unfold compose. simpl. destruct (f n).
+    + reflexivity.
+    + simpl. apply IHl'.
+Qed.
