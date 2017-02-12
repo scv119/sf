@@ -532,3 +532,168 @@ Proof.
  SearchAbout (_ ++ []).
   apply app_nil_r.
 Qed.
+
+Theorem evenb_double : forall k, evenb (double k) = true.
+Proof.
+  intros k. induction k as [|k' IHk'].
+  - reflexivity.
+  - simpl. apply IHk'.
+Qed.
+
+Theorem evenb_double_conv : forall n,
+  exists k, n = if evenb n then double k
+                else S (double k).
+Proof.
+  intros n. induction n as [|m].
+  - exists 0. reflexivity.
+  - destruct IHm. destruct (evenb m) eqn: H1.
+    + exists x. rewrite evenb_S. rewrite H1. simpl. rewrite H. reflexivity.
+    + exists (S x). rewrite evenb_S. rewrite H1. simpl. rewrite H. reflexivity.
+Qed.
+
+Theorem even_bool_prop : forall n,
+  evenb n = true <-> exists k, n = double k.
+Proof.
+  intros n. split.
+  - intros H. destruct (evenb_double_conv n) as [k Hk].
+    rewrite Hk. rewrite H. exists k. reflexivity.
+  - intros [k Hk]. rewrite Hk. apply evenb_double.
+Qed.
+
+
+Theorem beq_nat_true_iff : forall n1 n2 : nat,
+  beq_nat n1 n2 = true <-> n1 = n2.
+Proof.
+  intros n1 n2. split.
+  - apply beq_nat_true.
+  - intros H. rewrite H. rewrite <- beq_nat_refl. reflexivity.
+Qed.
+
+Lemma andb_true_iff : forall b1 b2:bool,
+  b1 && b2 = true <-> b1 = true /\ b2 = true.
+Proof.
+  intros b1 b2. split.
+  - unfold andb. destruct b1.
+    + intros H. split. reflexivity. apply H.
+    + intros H. inversion H.
+  - intros [H1 H2]. rewrite H1. rewrite H2. reflexivity.
+Qed.
+
+Lemma orb_true_iff : forall b1 b2,
+  b1 || b2 = true <-> b1 = true \/ b2 = true.
+Proof.
+  intros b1 b2. split.
+  - destruct b1.
+    + intros H. left. reflexivity.
+    + simpl. intros H. right. apply H.
+  - intros [H | H].
+    + rewrite H. reflexivity.
+    + rewrite H. destruct b1. reflexivity. reflexivity.
+Qed.
+
+
+Theorem beq_nat_false_iff : forall x y : nat,
+  beq_nat x y = false <->  x <> y.
+Proof.
+ intros x y. split.
+generalize dependent y.
+  - induction x as [|x'].
+    + simpl. destruct y. intros H. inversion H. intros H. unfold not. intros H1. inversion H1.
+    + intros y H. destruct y.
+      * unfold not. intros H1. inversion H1.
+      * simpl in H. apply IHx' in H. unfold not. intros H1. inversion H1.  rewrite H2 in H. unfold not in H. apply H. reflexivity.
+  -  unfold not. generalize dependent y. induction x as [|x'].
+    + simpl. destruct y.
+      * intros H. exfalso. apply H. reflexivity.
+      * intros H.  reflexivity.
+    + intros y H. destruct y.
+      * simpl. reflexivity.
+      * simpl. apply IHx'. intros H1. apply H. apply f_equal. apply H1.
+Qed.
+
+
+Fixpoint beq_list {A} (beq : A -> A -> bool)
+                  (l1 l2 : list A) : bool  :=
+  match l1, l2 with 
+  | [], [] => true
+  | s::t, u::v => if beq s u then beq_list beq t v else false
+  | _, _ => false
+  end.
+
+Lemma beq_list_true_iff :
+  forall A (beq : A -> A -> bool),
+    (forall a1 a2, beq a1 a2 = true <-> a1 = a2) ->
+    forall l1 l2, beq_list beq l1 l2 = true <-> l1 = l2.
+Proof.
+  intros A beq H. split.
+  generalize dependent l2.
+  - induction l1 as [|x l1' IHl1'].
+    + intros l2. intros H1. destruct l2. reflexivity. simpl in H1. inversion H1.
+    + intros l2. induction l2 as [|y l2' IHl2'].
+      * intros H1. simpl in H1. inversion H1.
+      * intros H1. simpl in H1. destruct (beq x y) eqn:Heq.
+        apply H in Heq. apply IHl1' in H1. rewrite H1. rewrite Heq. reflexivity.
+        inversion H1.
+  - generalize dependent l2. induction l1 as [|x l1' IHl'].
+    + intros l2 H1. rewrite <- H1. reflexivity.
+    + intros l2. induction l2 as [|y l2' IHl2'].
+      * intros H1. simpl in H1. inversion H1.
+      * intro H1. inversion H1. simpl. destruct (beq y y) eqn:Heq.
+         rewrite <- H3. apply IHl'. reflexivity.
+         destruct H1. assert (H4 : y = y). { reflexivity. } apply H in H4. rewrite H4 in Heq. inversion Heq.
+Qed.
+
+
+Theorem forallb_true_iff : forall X test (l : list X),
+  forallb test l = true <-> All (fun x => test x = true) l.
+Proof.
+  intros X test l. split.
+  - induction l as [|x l' IHl'].
+    + simpl. intros H. apply I.
+    + simpl. intros H. apply andb_true_iff in H. destruct H. split.
+      * apply H.
+      * apply IHl'. apply H0.
+  - induction l as [|x l' IHl'].
+    + simpl. intros H. reflexivity.
+    + simpl. intros [H1 H2]. rewrite H1. apply IHl' in H2. rewrite H2. reflexivity.
+Qed.
+
+(* forallb test l = false <-> exists x, x in l -> test x = false *)
+
+Definition excluded_middle := forall P : Prop,
+  P \/ ~ P.
+
+Theorem restricted_excluded_middle : forall P b,
+  (P <-> b = true) -> P \/ ~ P.
+Proof.
+  intros P [] H.
+  - left. rewrite H. reflexivity.
+  - right. rewrite H. intros contra. inversion contra.
+Qed.
+
+
+Theorem excluded_middle_irrefutable: forall (P:Prop),
+  ~ ~ (P \/ ~ P).
+Proof.
+  intros P. unfold not. intros H. apply H.
+  right.
+  intros H1. apply H. left. apply H1.
+Qed.
+
+Theorem test : forall (P : Prop),
+  ~~ P -> P.
+Proof.
+  intros P. unfold not. intros H.
+Abort.
+
+Theorem not_exists_dist:
+  excluded_middle ->
+  forall (X : Type) (P : X -> Prop),
+    ~ (exists x, ~ P x) -> (forall x, P x).
+Proof. 
+  intros H X P H1 x. unfold excluded_middle in H. assert (P x \/ ~ P x). { apply H. } 
+  destruct H0 as [H2 | H2].
+  - apply H2.
+  - exfalso. unfold not in H1. apply H1. exists x. apply H2.
+Qed.
+
