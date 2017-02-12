@@ -427,3 +427,108 @@ Proof.
           apply H2. apply H4. apply H.
 Qed.
         
+
+Definition combine_odd_even (Podd Peven : nat -> Prop) : nat -> Prop :=
+  fun n : nat => if oddb n then Podd n else Peven n.
+
+Theorem combine_odd_even_intro :
+  forall (Podd Peven : nat -> Prop) (n : nat),
+    (oddb n = true -> Podd n) ->
+    (oddb n = false ->  Peven n) ->
+    combine_odd_even Podd Peven n.
+Proof.
+  intros Podd Peven n H1 H2.
+  unfold combine_odd_even. destruct (oddb n) eqn : H3.
+  - apply H1. reflexivity.
+  - apply H2. reflexivity.
+Qed.
+
+Theorem combine_odd_even_elim_odd:
+  forall (Podd Peven : nat -> Prop) (n : nat),
+  combine_odd_even Podd Peven n ->
+  oddb n = true ->
+  Podd n.
+Proof.
+  intros Podd Peven n H1 H2. unfold combine_odd_even in H1. rewrite H2 in H1. apply H1.
+Qed.
+
+Theorem combine_odd_even_elim_even:
+  forall (Podd Peven : nat -> Prop) (n : nat),
+  combine_odd_even Podd Peven n ->
+  oddb n = false ->
+  Peven n.
+Proof.
+  intros Podd Peven n H1 H2. unfold combine_odd_even in H1. rewrite H2 in H1. apply H1.
+Qed.
+
+Check plus_comm.
+
+Lemma plus_comm3_take2 :
+  forall n m p, n + (m + p) = (p + m) + n.
+Proof.
+  intros n m p.
+  rewrite plus_comm.
+  rewrite (plus_comm p).
+  reflexivity.
+Qed.
+
+Lemma proj1 : forall P Q : Prop,
+  P /\ Q -> P.
+Proof.
+  intros P Q [HP HQ].
+  apply HP. Qed.
+
+Example lemma_application_ex :
+  forall {n : nat} {ns : list nat},
+    In n (map (fun m => m * 0) ns) ->
+    n = 0.
+Proof.
+  intros n ns H.
+  destruct (proj1 _ _ (In_map_iff _ _ _ _ _) H)
+           as [m [Hm _]].
+  rewrite mult_0_r in Hm. rewrite <- Hm. reflexivity.
+Qed.
+
+
+Axiom functional_extensionality : forall {X Y: Type}
+                                    {f g : X -> Y},
+  (forall (x:X), f x = g x) -> f = g.
+
+
+Lemma plus_comm_ext : plus = fun n m => m + n.
+Proof.
+  apply functional_extensionality. intros n.
+  apply functional_extensionality. intros m.
+  apply plus_comm.
+Qed.
+
+Print Assumptions plus_comm_ext.
+
+Fixpoint rev_append {X} (l1 l2 : list X) : list X :=
+  match l1 with
+  | [] => l2
+  | x :: l1' => rev_append l1' (x :: l2)
+  end.
+
+
+Definition tr_rev {X} (l : list X) : list X :=
+  rev_append l [].
+
+
+Lemma tr_rev_aux_correct :
+  forall T (l1 l2 : list T),
+    rev_append l1 l2 = rev l1 ++ l2.
+Proof.
+  intros T l1.
+  induction l1 as [|t l3 IHl].
+  - reflexivity.
+  - simpl. SearchAbout ((_ ++ _) ++ _). symmetry. rewrite <- app_assoc. rewrite IHl. reflexivity.
+Qed.
+
+Lemma tr_rev_correct : forall X, @tr_rev X = @rev X.
+Proof.
+  intros X. apply functional_extensionality.
+  intros x. unfold tr_rev. rewrite tr_rev_aux_correct.
+ SearchAbout (_ ++ []).
+  apply app_nil_r.
+Qed.
