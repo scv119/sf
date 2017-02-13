@@ -697,3 +697,40 @@ Proof.
   - exfalso. unfold not in H1. apply H1. exists x. apply H2.
 Qed.
 
+Definition peirce := forall P Q: Prop,
+  ((P-> Q)-> P) -> P.
+
+Definition double_negation_elimination := forall P:Prop,
+  ~~P -> P.
+
+Definition de_morgan_not_and_not := forall P Q:Prop,
+  ~(~P /\ ~Q) -> P \/ Q.
+
+Definition implies_to_or := forall P Q:Prop,
+  (P -> Q) -> (~P \/ Q).
+
+Theorem peirce_execluded_middle:
+  excluded_middle -> peirce.
+Proof.
+  unfold excluded_middle. unfold peirce.
+  intros H. intros P Q. intros H1. assert (P  \/ ~ P ). { apply H. }
+  destruct H0 as [H2 | H2].
+  - apply H2.
+  - apply H1. intros H3. exfalso. apply H2. apply H3.
+Qed. 
+
+Lemma peirce_lemma1:
+  forall P Q, ~(P \/ Q) -> ~P.
+Proof.
+  intros P Q H1.
+  unfold not. intros H2. unfold not in H1. apply H1. left. apply H2.
+Qed.
+
+Theorem execluded_middle_peirce:
+ peirce ->  excluded_middle.
+Proof.
+  unfold excluded_middle. unfold peirce.
+  intros H. intros P. assert (H1: (((P \/ ~P) -> False) -> (P \/ ~P)) -> (P \/ ~P) ). apply H.
+  apply H1. intros H2. right.  apply peirce_lemma1 in H2. apply H2.
+Qed.
+
