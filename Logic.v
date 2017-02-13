@@ -734,3 +734,58 @@ Proof.
   apply H1. intros H2. right.  apply peirce_lemma1 in H2. apply H2.
 Qed.
 
+Theorem execluded_middle_to_double_negation_elimination:
+  excluded_middle -> double_negation_elimination.
+Proof.
+  unfold excluded_middle. unfold double_negation_elimination.
+  intros H P. unfold not. assert (P  \/ ~ P ). { apply H. }
+  destruct H0 as [H1 | H1].
+  - intros H2. apply H1.
+  - intros H2. exfalso. apply H2. apply H1.
+Qed.
+
+Theorem double_negation_elimination_to_execluded_middle:
+  double_negation_elimination -> excluded_middle.
+Proof.
+  unfold excluded_middle. unfold double_negation_elimination.
+  intros H P. apply H. apply excluded_middle_irrefutable.
+Qed.
+
+Theorem execluded_middle_to_de_morgan_not_and_not:
+  excluded_middle -> de_morgan_not_and_not.
+Proof.
+  unfold excluded_middle. unfold de_morgan_not_and_not.
+  intros H P Q H1. assert (P  \/ ~ P ). { apply H. }
+  destruct H0 as [H2 | H2].
+  - left. apply H2.
+  - assert (Q  \/ ~ Q ). { apply H. }  destruct H0 as [H3 | H3].
+    + right. apply H3.
+    + exfalso. apply H1. split. apply H2. apply H3.
+Qed.
+
+Theorem de_morgan_not_and_not_to_execluded_middle:
+  de_morgan_not_and_not -> excluded_middle.
+Proof.
+  unfold excluded_middle. unfold de_morgan_not_and_not.
+  intros H P. assert ( ~ (~ P /\ ~ (~P)) -> P \/ (~P) ). { apply H. }
+  apply H0. unfold not. intros [H1 H2]. apply H2. apply H1.
+Qed.
+
+Theorem execluded_middle_to_implies_to_or:
+  excluded_middle -> implies_to_or.
+Proof.
+  unfold excluded_middle. unfold implies_to_or.
+  intros H P Q H1. assert (P  \/ ~ P ). { apply H. }
+   destruct H0 as [H2 | H2].
+  - right. apply H1. apply H2.
+  - left. apply H2.
+Qed.
+
+
+Theorem implies_to_or_to_execluded_middle:
+  implies_to_or -> excluded_middle.
+Proof.
+  unfold excluded_middle. unfold implies_to_or.
+  intros H P. assert ((P -> P) -> ~ P \/ P ). { apply H. }
+  apply or_commut. apply H0. intros H1. apply H1.
+Qed.
