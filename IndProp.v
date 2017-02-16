@@ -313,3 +313,202 @@ Qed.
 
 
 Module R.
+
+Inductive R : nat -> nat -> nat -> Prop :=
+  | c1 : R 0 0 0
+  | c2 : forall m n o, R m n o -> R (S m) n (S o)
+  | c3 : forall m n o, R m n o -> R m (S n) (S o)
+  | c4 : forall m n o, R (S m) (S n) (S (S o)) -> R m n o
+  | c5 : forall m n o, R m n o -> R n m o.
+
+(* 
+1. R 1 1 2 Provable, R 2 2 6 Not.
+2. nope, c1 c2 3 -> c5.
+3. nope  same reason
+*)
+
+Definition fR (a:nat) (b: nat) : nat :=
+  a + b.
+
+Theorem R_equiv_fR : forall m n o, R m n o <-> fR m n = o.
+Proof.
+  intros m n o. unfold fR. split.
+  - intros H. induction H.
+    + reflexivity.
+    + rewrite plus_comm. rewrite <- plus_n_Sm. rewrite plus_comm. rewrite IHR. reflexivity.
+    + rewrite <- plus_n_Sm. rewrite IHR. reflexivity.
+    +  rewrite <- plus_n_Sm in IHR. inversion IHR. reflexivity.
+    +  rewrite plus_comm. apply IHR. 
+  - generalize dependent m.
+    generalize dependent n.
+    induction o as [|o' H].
+    + intros [|n'] [|m'] H.
+      * apply c1.
+      * inversion H.
+      * inversion H.
+      * inversion H.
+    + intros n [|m'] H1.
+      * simpl in H1. destruct n. 
+        inversion H1.
+        inversion H1. apply c3. apply H. reflexivity.
+      * apply c2. apply H. rewrite plus_comm in H1. rewrite <- plus_n_Sm in H1. inversion H1.
+        apply plus_comm.
+Qed.
+
+End R.
+
+Inductive subseq : list nat -> list nat -> Prop :=
+  | ss1 : subseq [] []
+  | ss2 : forall n l1 l2, subseq l1 l2 -> subseq l1 (n::l2)
+  | ss3 : forall n l1 l2, subseq l1 l2 -> subseq (n::l1) (n::l2).
+
+Theorem subseq_refl : forall l, subseq l l.
+Proof. 
+  intros l. induction l as [|n' l' IH].
+  - apply ss1.
+  - apply ss3. apply IH.
+Qed.
+
+Lemma subseq_empty: forall l,
+  subseq [] l.
+Proof.
+  Admitted.
+
+Theorem subse_app : forall l1 l2 l3,
+  subseq l1 l2 -> subseq l1 (l2 ++ l3).
+Proof.
+  intros l1 l2 l3 H. induction H.
+  - induction l3 as [|n l3' IHl3'].
+    + simpl. apply ss1.
+    + simpl. apply ss2. simpl in IHl3'. apply IHl3'.
+  - simpl. apply ss2. apply IHsubseq.
+  - simpl. apply ss3. apply IHsubseq.
+Qed.
+
+
+Inductive reg_exp (T : Type) : Type :=
+| EmptySet : reg_exp T
+| EmptyStr : reg_exp T
+| Char : T -> reg_exp T
+| App : reg_exp T ->reg_exp T -> reg_exp T
+| Union : reg_exp T -> reg_exp T -> reg_exp T
+| Star : reg_exp T -> reg_exp T.
+
+Arguments EmptySet {T}.
+Arguments EmptyStr {T}.
+Arguments Char {T} _.
+Arguments App {T} _ _.
+Arguments Union {T} _ _.
+Arguments Star {T} _.
+
+Inductive exp_match {T} : list T -> reg_exp T -> Prop :=
+| MEmpty : exp_match [] EmptyStr
+| MChar : forall x, exp_match [x] (Char x)
+| MApp : forall s1 re1 s2 re2,
+      exp_match s1 re1 -> exp_match s2 re2 -> exp_match (s1 ++ s2) (App re1 re2)
+| MUnionL : forall s1 re1 re2,
+              exp_match s1 re1 ->
+              exp_match s1 (Union re1 re2)
+| MUnionR : forall re1 s2 re2,
+              exp_match s2 re2 ->
+              exp_match s2 (Union re1 re2)
+| MStar0 : forall re, exp_match [] (Star re)
+| MStarApp : forall s1 s2 re,
+               exp_match s1 re ->
+               exp_match s2 (Star re) ->
+               exp_match (s1 ++ s2) (Star re).
+
+Notation "s =~ re" := (exp_match s re) (at level 80).
+
+Example reg_exp_ex1 : [1] =~ Char 1.
+Proof.
+  apply MChar.
+Qed.
+
+Example reg_exp_ex2 : [1; 2] =~ App (Char 1) (Char 2).
+Proof.
+  apply (MApp [1] _ [2] _).
+  - apply MChar.
+  - apply MChar.
+Qed.
+
+Example reg_exp_ex3 : ~ ([1; 2] =~ Char 1).
+Proof.
+  intros H. inversion H.
+Qed.
+
+Fixpoint reg_exp_of_list {T} (l : list T) :=
+  match l with
+  | [] => EmptyStr
+  | x :: l' => App (Char x) (reg_exp_of_list l')
+  end.
+
+
+Example reg_exp_ex4 : [1; 2; 3] =~ reg_exp_of_list [1; 2; 3].
+Proof.
+  simpl. apply (MApp [1]).
+  { apply MChar. }
+  apply (MApp [2]).
+  { apply MChar. }
+  apply (MApp [3]).
+  { apply MChar. }
+  apply MEmpty.
+Qed.
+
+Lemma MStar1 :
+  forall T s (re : reg_exp T) ,
+    s =~ re ->
+    s =~ Star re.
+Proof.
+  intros T s re H.
+  rewrite <- (app_nil_r _ s).
+  apply (MStarApp s [] re).
+  - apply H.
+  - apply MStar0.
+Qed.
+
+Lemma empty_is_empty : forall T (s : list T),
+  ~ (s =~ EmptySet).
+Proof.
+  intros T s H. inversion H.
+Qed.
+
+Lemma MUnion' : forall T (s : list T) (re1 re2 : reg_exp T),
+  s =~ re1 \/ s =~ re2 ->
+  s =~ Union re1 re2.
+Proof.
+  intros T s re1 re2 [H|H].
+  - apply MUnionL. apply H.
+  - apply MUnionR. apply H.
+Qed.
+
+Lemma MStar' : forall T (ss : list (list T)) (re : reg_exp T),
+  (forall s, In s ss -> s =~ re) ->
+  fold app ss [] =~ Star re.
+Proof.
+  intros T ss re H. induction ss.
+  - simpl. apply MStar0.
+  - simpl. apply MStarApp.
+    + apply H. simpl. left. reflexivity.
+    + apply IHss. intros s H1. apply H. simpl. right. apply H1.
+Qed.
+
+Lemma list_empty : forall T (s1 s2 : list T),
+  s1 ++ s2 = [] -> s1 = [].
+Admitted.
+
+Lemma reg_exp_of_list_spec : forall T (s1 s2 : list T),
+  s1 =~ reg_exp_of_list s2 <-> s1 = s2.
+Proof.
+  intros T s1 s2. split.
+  - generalize dependent s1. induction s2 as [|n s2' IHs2'].
+    + intros s1. simpl. intros H. inversion H. reflexivity.
+    + intros s1 H. destruct s1 as [|m s1'].
+      * simpl in H. inversion H. apply list_empty in H0. rewrite H0 in H3. inversion H3.
+      * simpl in H. inversion H. inversion H3. simpl. apply f_equal. apply IHs2'. apply H4.
+  - generalize dependent s1. induction s2 as [|n s2' IHs2'].
+    + intros s1 H. rewrite H. simpl. apply MEmpty.
+    + intros s1 H. rewrite H. simpl. apply (MApp [n]).
+      * apply MChar.
+      * apply IHs2'. reflexivity.
+Qed.
