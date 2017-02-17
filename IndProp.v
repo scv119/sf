@@ -668,3 +668,106 @@ Proof.
       * rewrite <- H2. rewrite <- H6. apply H.
       * apply H4. apply H6.
 Qed.
+
+Module Pumping.
+
+Fixpoint pumping_constant {T} (re : reg_exp T) : nat :=
+  match re with
+  | EmptySet => 0
+  | EmptyStr => 1
+  | Char _ => 2
+  | App re1 re2 =>
+      pumping_constant re1 + pumping_constant re2
+  | Union re1 re2 =>
+      pumping_constant re1 + pumping_constant re2
+  | Star _ => 1
+  end.
+
+Fixpoint napp {T} (n : nat) (l : list T) : list T :=
+  match n with
+  | 0 => []
+  | S n' => l ++ napp n' l
+  end.
+
+Lemma napp_plus: forall T (n m : nat) (l : list T),
+  napp (n + m) l = napp n l ++ napp m l.
+Proof.
+  intros T n m l.
+  induction n as [|n IHn].
+  - reflexivity.
+  - simpl. rewrite IHn, app_assoc. reflexivity.
+Qed.
+
+Lemma length_assoc1 : forall T ( a b c d : list T),
+  (a ++ b ++ c) ++ d = a ++ b ++ c ++ d.
+Admitted.
+
+
+Lemma length_assoc2 : forall T ( a b c d : list T),
+  (a ++ b) ++ c ++ d = a ++ b ++ c ++ d.
+Admitted.
+
+Lemma le_lemma1 : forall (a b c:nat),
+  a + b <= c -> a <= c /\ b <= c.
+Proof.
+  intros a b c H. split.
+  (* induction on b *)
+Admitted.
+
+Lemma app_lemma2 : forall T (a : list T),
+  a ++ [] = a.
+Proof.
+  apply app_nil_r.
+Qed.
+
+Lemma app_lemma3 : forall T (a : list T),
+  length a > 0 -> a <> [].
+Proof.
+  intros T a H H1. rewrite H1 in H. inversion H.
+Qed.
+
+Lemma pumping : forall T (re : reg_exp T) s,
+  s =~ re ->
+  pumping_constant re <= length s ->
+  exists s1 s2 s3,
+    s = s1 ++ s2 ++ s3 /\
+    s2 <> [] /\
+    exists m, s1 ++ napp m s2 ++ s3 =~ re.
+
+Require Import Coq.omega.Omega.
+
+Proof.
+  intros T re s Hmatch.
+  induction Hmatch
+    as [ | x | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
+       | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
+       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ].
+  - (* MEmpty *)
+    simpl. omega.
+  - simpl. omega.
+  - intros H. simpl in H. rewrite app_length in H. apply Nat.add_le_cases in H. destruct H.
+    + apply IH1 in H. destruct H as [x [y [z [H1 [H2 H3]]]]]. exists x, y, (z ++ s2). split.
+      * rewrite H1.  apply length_assoc1.
+      * split. apply H2. inversion H3. exists x0. rewrite <- length_assoc1. apply MApp. apply H. apply Hmatch2.
+    + apply IH2 in H. destruct H as [x [y [z [H4 [H5 H6]]]]]. exists (s1 ++ x), y , z. split.
+      * simpl. rewrite H4. rewrite <- length_assoc2. reflexivity.
+      * split. apply H5. inversion H6. exists x0. rewrite -> length_assoc2. apply MApp. apply Hmatch1. apply H.
+  - intros H. simpl in H. apply le_lemma1 in H. inversion H. apply IH in H0. destruct H0 as [x [y [z [H4 [H5 H6]]]]]. exists x, y , z. split.
+    + apply H4. 
+    + split.
+      * apply H5.
+      * inversion H6. exists x0. apply MUnionL. apply H0.
+  - intros H. simpl in H. apply le_lemma1 in H. inversion H. apply IH in H1. destruct H1 as [x [y [z [H4 [H5 H6]]]]]. exists x, y , z. split.
+    + apply H4. 
+    + split.
+      * apply H5.
+      * inversion H6. exists x0. apply MUnionR. apply H1.
+  - simpl. omega.
+  (* tricky, need some observation as induction rule doesn't work here *)
+  - simpl. intros H. exists [], (s1 ++ s2), []. simpl. split.
+    + rewrite app_lemma2. reflexivity.
+    + split. 
+      * apply app_lemma3 in H.  apply H.
+      * exists 0. apply MStar0.
+Qed.
+End Pumping.
