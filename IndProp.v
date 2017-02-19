@@ -884,3 +884,93 @@ Qed.
 
 Theorem rev_pal : forall X (l : list X), l = rev l -> pal l.
 Proof. intros. apply rev_pal_length with (n:=(length l)). constructor. apply H. Qed.
+
+
+Inductive inorder_merge {X}: list X ->  list X -> list X -> Prop :=
+  | im_empty : inorder_merge [] [] []
+  | im_left : forall (x:X) (a b c:list X), inorder_merge a b c -> inorder_merge (x::a) b (x::c)
+  | im_right : forall (x:X) (a b c:list X), inorder_merge a b c -> inorder_merge a (x::b) (x::c).
+
+Theorem filter_challenge : forall (X:Type) (test:X->bool) (l l1 l2:list X),
+  inorder_merge l1 l2 l ->  
+  (forall x, In x l1 -> test x = true) ->
+  (forall x, In x l2 -> test x = false) ->
+  filter test l = l1.
+Proof.
+  intros X test l l1 l2 H. induction H as [|x a b c H3 IH|x a b c H3 IH].
+  - intros _ _. reflexivity.
+  - intros H4 H5. simpl in H4. simpl.  assert (H6: test x = true). { apply H4. left. reflexivity. }
+    rewrite H6. simpl. apply f_equal. apply IH.
+      * intros x0. intros H7. apply H4. right. apply H7.
+      * intros x0. intros H7. apply H5. apply H7.
+  - intros H4 H5. simpl.  assert (H6: test x = false). { apply H5. left. reflexivity. }
+    rewrite H6. simpl. apply IH.
+      * intros x0. intros H7. apply H4.  apply H7.
+      * intros x0. intros H7. apply H5. right. apply H7.
+Qed.
+
+Inductive subsequence {X}: list X -> list X -> Prop :=
+  | sub_empty : subsequence [] [] 
+  | sub_one : forall (x:X) (l1 l2:list X), subsequence l1 l2 -> subsequence l1 (x::l2)
+  | sub_both : forall (x:X) (l1 l2: list X), subsequence l1 l2 -> subsequence (x::l1) (x::l2).
+
+Theorem filter_challenge_2 : forall (X:Type) (test:X->bool) (l l1:list X),
+  subsequence l1 l -> (forall x, In x l1 -> test x = true) -> length l1 <= length (filter test l).
+Proof.
+  intros X test l l1 H. induction H as [| x l1' l2' H1 IH | x l1' l2' H1 IH ].
+  - intros _. simpl. apply le_n.
+  - intros H. simpl. destruct (test x) eqn:Heq.
+    + simpl. apply le_S. apply IH. intros y H2. apply H. apply H2.
+    + apply IH.  intros y H2. apply H. apply H2.
+  - intros H. assert (H2: test x = true). { apply H. left. reflexivity. } 
+    simpl. rewrite H2. simpl. apply n_le_m__Sn_le_Sm. apply IH. intros y H3. apply H. right. apply H3.
+Qed.
+
+Definition disjoint {X:Type} (l1: list X) (l2:list X) : Prop :=
+  forall x : X, (In x l1 -> ~(In x l2)) /\ ( In x l2 -> ~(In x l1)).
+
+Theorem disjoint_lemma: forall (X:Type) (l1: list X) (l2:list X),
+  disjoint l1 l2 -> ~(exists x:X, In x l1 /\ In x l2).
+Proof.
+  intros X l1 l2 H [x [H1 H2]]. unfold disjoint in H. apply H in H1. apply H1. apply H2.
+Qed.
+
+Theorem in_more: forall (X:Type) (x y:X) (l: list X),
+  In x l -> In x (y::l).
+Proof.
+  intros X x y l H. simpl. right. apply H.
+Qed.
+
+Theorem disjoint_lemma1: forall (X:Type) (x:X) (l1: list X) (l2:list X),
+  disjoint (x::l1) l2 -> disjoint l1 l2.
+Proof.
+  unfold disjoint.
+  intros X x l1 l2 H. intros y. split.
+  - intros H1 H2. apply H in H2. apply H2. apply in_more. apply H1.
+  - intros H1 H2. apply H in H1. apply H1. apply in_more. apply H2.
+Qed.
+
+Inductive NoDup {X}: list X -> Prop :=
+  | nd_empty : NoDup []
+  | nd_more : forall (x:X) (l:list X), NoDup l -> ~(In x l) -> NoDup (x::l).
+
+Theorem nodup_lemma: forall (X:Type) (x:X) (l : list X),
+  NoDup (x::l) -> ~(In x l).
+Proof.
+  intros X x l H. inversion H. apply H3.
+Qed.
+
+
+Theorem disjoing_nodup: forall (X:Type) (l1 l2: list X),
+  disjoint l1 l2 -> NoDup l1 -> NoDup l2 -> NoDup (l1 ++ l2).
+Proof.
+  intros X l1. induction l1 as [|x l1' IHl1].
+  - intros l2 H1 H2 H3. simpl. apply H3.
+  - intros l2 H1 H2 H3. simpl. apply nd_more.
+    + apply IHl1. apply disjoint_lemma1 with (x:=x). apply H1. inversion H2. apply H4. apply H3.
+    + intros H4. apply in_app_iff in H4. inversion H4.
+      * apply nodup_lemma in H2. apply H2. apply H.
+      * unfold disjoint in H1. apply H1 in H. apply H. simpl. left. reflexivity.
+Qed.
+
+
