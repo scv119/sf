@@ -771,3 +771,116 @@ Proof.
       * exists 0. apply MStar0.
 Qed.
 End Pumping.
+
+Theorem filter_not_empty_In : forall n l,
+  filter (beq_nat n) l <> [] ->
+  In n l.
+Proof.
+  intros n l. induction l as [|m l' IHl'].
+  - simpl. intros H. apply H. reflexivity.
+  - simpl. destruct (beq_nat n m) eqn : H.
+    + intros _. rewrite beq_nat_true_iff in H. rewrite H. left. reflexivity.
+    + intros H1. right. apply IHl'. apply H1.
+Qed.
+
+Inductive reflect (P : Prop) : bool -> Prop :=
+  | ReflectT : P -> reflect P true
+  | ReflectF : ~P -> reflect P false. 
+
+Theorem iff_reflect : forall P b, (P <-> b = true) -> reflect P b.
+Proof.  intros P [] H.
+   - apply ReflectT. rewrite H. reflexivity.
+   - apply ReflectF. rewrite H. intros H'. inversion H'.
+Qed.
+
+Theorem reflect_iff : forall P b, reflect P b -> (P <-> b = true).
+Proof. intros P b H. inversion H.
+  - split. 
+  * intros _. reflexivity.
+  * intros _. apply H0.
+  - split.
+    * intros H2. exfalso. apply H0. apply H2.
+    * intros H2. inversion H2.
+Qed.
+
+Lemma beq_natP : forall n m, reflect (n = m) (beq_nat n m).
+Proof.
+  intros n m.
+  apply iff_reflect. rewrite beq_nat_true_iff.  reflexivity.
+Qed.
+
+Check beq_natP.
+
+Theorem filter_not_empty_In' : forall n l,
+  filter (beq_nat n) l <> [] ->
+  In n l.
+Proof.
+  intros n l. induction l as [|m l' IHl'].
+  - simpl. intros H. apply H. reflexivity.
+  - simpl. 
+    Check (beq_natP n m).
+    destruct (beq_natP n m) as [H|H].
+    + intros _. left. rewrite H. reflexivity.
+    + intros H1. right. apply IHl'. apply H1.
+Qed.
+
+Inductive pal {X}: list X -> Prop :=
+  | pal_empty : pal []
+  | pal_one : forall x, pal [x]
+  | pal_add : forall x l, pal l -> pal ([x] ++ l ++ [x]).
+
+Lemma pal_app1 : forall (X:Type) (a b c d: list X),
+  a ++ b ++ c ++ d = a ++ (b ++ c) ++ d.
+Admitted.
+
+Theorem pal_app_rev : forall (X:Type) (l: list X),
+  pal (l ++ rev l).
+Proof.
+  intros X l. induction l as [|n l' IHl'].
+  - simpl. apply pal_empty.
+  - simpl. assert (H1: forall (a:X) (b: list X), a::b = [a] ++ b).
+    { simpl. reflexivity. } rewrite H1. rewrite pal_app1. apply pal_add. apply IHl'.
+Qed.
+
+Theorem pal_rev: forall (X:Type) (l: list X),
+   pal l -> l = rev l.
+Proof.
+  intros X l H. induction H as [|x|x l H].
+  - reflexivity.
+  - reflexivity.
+  - simpl. rewrite rev_swap. rewrite <- IHH. reflexivity.
+Qed.
+
+SearchAbout rev.
+
+Lemma rev_pal_lemma : forall (X:Type) (a:X) (b c : list X),
+    b ++ [a] = c ++ [a] -> b = c.
+Admitted.
+
+Lemma app_commu : forall (X:Type)  (a b : list X),
+    a ++ b = b ++ a.
+Admitted.
+
+(* Why does this work? *)
+Lemma rev_pal_length : forall (X:Type) (n:nat) (l:list X), length l <= n -> l = rev l -> pal l.
+Proof.
+  induction n.
+  - intros. inversion H. destruct l.
+    + apply pal_empty.
+    + inversion H2.
+  - destruct l.
+    + constructor.
+    + simpl in *.
+      intros H1 H2. destruct (rev l) eqn: Heqn.
+      * inversion H2. constructor. 
+      * assert( H: x :: l = x :: (rev (rev l))). { rewrite  rev_involutive. reflexivity. } rewrite H in H2. rewrite Heqn in H2.
+        simpl in H2. inversion H2. assert (H5: rev (rev l) = rev (x0 :: l0)). { apply f_equal. apply Heqn. } rewrite rev_involutive in H5.
+        rewrite H5. simpl. constructor. assert (H6: rev l0 = l0). { apply rev_pal_lemma with (a:=x0). apply H4. } rewrite H6.
+        apply IHn.
+        { apply Sn_le_Sm__n_le_m in H1. assert (H7: length l0 <= length l). { rewrite H5. simpl. rewrite H6. SearchAbout app. rewrite app_commu. simpl. constructor. constructor. }
+          apply le_trans with (n:= (length l)). apply H7. apply H1. }
+        symmetry. apply H6.
+Qed.
+
+Theorem rev_pal : forall X (l : list X), l = rev l -> pal l.
+Proof. intros. apply rev_pal_length with (n:=(length l)). constructor. apply H. Qed.
