@@ -1,6 +1,7 @@
 Add LoadPath "/Users/chenshen/src/sf/".
 Require Export Logic.
 
+
 Inductive ev : nat -> Prop :=
 | ev_0 : ev 0
 | ev_SS : forall n : nat, ev n -> ev (S (S n)).
@@ -972,5 +973,87 @@ Proof.
       * apply nodup_lemma in H2. apply H2. apply H.
       * unfold disjoint in H1. apply H1 in H. apply H. simpl. left. reflexivity.
 Qed.
+ 
+
+Inductive nostutter {X:Type} : list X -> Prop :=
+  | ns_empty : nostutter []
+  | ns_one: forall x:X, nostutter [x]
+  | ns_acc: forall (x y:X) (l:list X), x <> y -> nostutter (x::l) -> nostutter (y::x::l).
+
+Example test_nostutter_1: nostutter [3;1;4;1;5;6].
+Proof. repeat constructor; apply beq_nat_false_iff; auto.
+Qed.
+
+Example test_nostutter_2: nostutter (@nil nat).
+Proof. repeat constructor; apply beq_nat_false_iff; auto.
+Qed.
 
 
+Example test_nostutter_3: nostutter [5].
+Proof. repeat constructor; apply beq_nat_false; auto. Qed.
+
+Example test_nostutter_4: not (nostutter [3;1;1;4]).
+Proof. 
+  intro.
+  repeat match goal with
+    h: nostutter _ |- _ => inversion h; clear h; subst
+  end.
+  contradiction H1; auto. Qed.
+
+Lemma in_split : forall (X:Type) (x:X) (l:list X),
+  In x l ->
+  exists l1 l2, l = l1 ++ x::l2.
+Proof.
+  intros X x l.
+  generalize dependent x.
+  induction l as [|y l' IHl].
+  - intros x H. inversion H.
+  - intros x [H|H].
+    + exists [], l'. rewrite H. reflexivity.
+    + apply IHl in H. inversion H as [l1 [l2 H1]].
+      exists (y::l1), l2. rewrite H1. simpl. reflexivity.
+Qed.
+
+Inductive repeats {X:Type} : list X -> Prop :=
+  | rp_cons : forall (x:X) (l:list X), In x l -> repeats (x::l)
+  | rp_more : forall (x:X) (l:list X), repeats l -> repeats (x::l).
+
+Lemma pigeonhole_principle_lemma : forall (X:Type) (x:X) (l1 l2 : list X),
+  (forall y, In y (x::l1) -> In y l2) -> In x l2.
+Proof.
+  intros X x l1 l2 H. apply H with (y:=x). simpl. left. reflexivity.
+Qed.
+
+Lemma pigeonhole_principle_lemma1 : forall (X:Type) (x y:X) (l1 l2 : list X),
+  In y (l1 ++ x::l2) -> y <> x -> In y (l1 ++ l2).
+Proof.
+  intros X x y l1 l2 H1 H2.
+  apply in_app_iff.
+  apply in_app_iff in H1. destruct H1.
+  - left. apply H.
+  - right. destruct H.
+    * exfalso. apply H2. symmetry. apply H.
+    * apply H.
+Qed.
+
+Theorem pigeonhole_principle : forall (X:Type) (l1 l2 : list X),
+  excluded_middle -> 
+  (forall x, In x l1 -> In x l2) ->
+  length l2 < length l1 ->
+  repeats l1.
+Proof.
+  intros X l1. induction l1 as [|x l1' IHl1].
+  - intros l2 H H1 H2. inversion H2.
+  - intros l2 H H1 H2. unfold excluded_middle in H. assert (H3: (In x l1') \/ ~(In x l1')). { apply H with (P:= (In x l1')). }
+    inversion H3.
+    * apply rp_cons. apply H0.
+    * apply rp_more. assert (H4: In x l2). { apply pigeonhole_principle_lemma in H1.  apply H1. } apply in_split in H4.
+      inversion H4 as [l3 [l4 H5]].
+      apply IHl1 with (l2:=(l3 ++ l4)). unfold excluded_middle. 
+      { apply H. }
+      { intros y H6. assert (H7: y <> x). { intros  H7. apply H0. rewrite <- H7. apply H6. } assert (H8: In y (x::l1')). { simpl. right. apply H6. }
+         apply H1 in H8. rewrite H5 in H8. apply pigeonhole_principle_lemma1 with (x:=x). apply H8. apply H7. }
+      { rewrite H5 in H2. rewrite app_length in H2. simpl in H2. rewrite <- plus_n_Sm in H2. apply Sn_le_Sm__n_le_m in H2.
+        rewrite app_length. apply H2. }
+Qed.
+      
