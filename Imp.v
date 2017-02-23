@@ -192,3 +192,89 @@ Proof.
       try (simpl; simpl in IHa1; rewrite IHa1; rewrite IHa2; reflexivity).
     + destruct n; simpl; try rewrite IHa2; reflexivity.
 Qed.
+
+Tactic Notation "simpl_and_try" tactic(c) :=
+  simpl;
+  try c.
+
+Require Import Coq.omega.Omega.
+
+Example silly_presburger_example : forall m n o p,
+  m + n <= n + o /\ o + 3 = p + 3 ->
+  m <= p.
+Proof.
+  intros. omega.
+Qed.
+
+Module aevalR_first_try.
+
+Inductive aevalR : aexp -> nat -> Prop :=
+  | E_ANum : forall (n : nat), aevalR (ANum n) n
+  | E_APlus : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (APlus e1 e2) (n1 + n2)
+  | E_AMinus : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (AMinus e1 e2) (n1 - n2)
+  | E_AMult : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (AMult e1 e2) (n1 * n2).
+
+Notation "e '\\' n"
+         := (aevalR e n)
+            (at level 50, left associativity)
+         : type_scope.
+
+End aevalR_first_try.
+
+Reserved Notation "e '\\' n" (at level 50, left associativity).
+
+Inductive aevalR : aexp -> nat -> Prop :=
+  | E_ANum : forall (n:nat),
+      (ANum n) \\ n
+  | E_APlus : forall (e1 e2: aexp) (n1 n2 : nat),
+      (e1 \\ n1) -> (e2 \\ n2) -> (APlus e1 e2) \\ (n1 + n2)
+  | E_AMinus : forall (e1 e2: aexp) (n1 n2 : nat),
+      (e1 \\ n1) -> (e2 \\ n2) -> (AMinus e1 e2) \\ (n1 - n2)
+  | E_AMult :  forall (e1 e2: aexp) (n1 n2 : nat),
+      (e1 \\ n1) -> (e2 \\ n2) -> (AMult e1 e2) \\ (n1 * n2)
+
+  where "e '\\' n" := (aevalR e n) : type_scope.
+
+
+Theorem aeval_iff_aevalR : forall a n,
+  (a \\ n) <-> aeval a = n.
+Proof.
+  split.
+  - intros H.
+    induction H; subst; reflexivity.
+  - generalize dependent n.
+    induction a; simpl; intros; subst; constructor; try  apply IHa1; try apply IHa2; reflexivity.
+Qed.
+
+Inductive bevalR : bexp -> bool -> Prop :=
+  | E_BTrue : bevalR BTrue true
+  | E_BFalse : bevalR BFalse false
+  | E_BEq : forall (a1 a2: aexp) (n1 n2 : nat),
+      (a1 \\ n1) -> (a2 \\ n2) -> bevalR (BEq a1 a2) (beq_nat n1 n2)
+  | E_BLe : forall (a1 a2: aexp) (n1 n2 : nat),
+      (a1 \\ n1) -> (a2 \\ n2) -> bevalR (BLe a1 a2) (leb n1 n2)
+  | E_BNot : forall (e : bexp) (b : bool),
+      bevalR e b -> bevalR (BNot e) (negb b)
+  | E_BAnd : forall (e1 e2 : bexp) (b1 b2 : bool),
+      (bevalR e1 b1) -> (bevalR e2 b2) -> bevalR (BAnd e1 e2) (andb b1 b2).
+
+Lemma beval_iff_bevalR : forall b bv,
+  bevalR b bv <-> beval b = bv.
+Proof.
+  split.
+  - intros H.
+    induction H; simpl; try apply aeval_iff_aevalR in H; try apply aeval_iff_aevalR in H0; subst; try reflexivity.
+  - generalize dependent bv.
+    induction b; simpl; intros; subst; constructor; 
+    try apply aeval_iff_aevalR; 
+    try apply IHb; 
+    try apply IHb1; try apply IHb2; 
+    reflexivity.
+Qed.
+
+End AExp.
+
+
