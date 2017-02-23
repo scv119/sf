@@ -277,4 +277,51 @@ Qed.
 
 End AExp.
 
+Module aevalR_division.
 
+Inductive aexp : Type :=
+  | ANum : nat -> aexp
+  | APlus : aexp -> aexp -> aexp
+  | AMinus : aexp -> aexp -> aexp
+  | AMult : aexp -> aexp -> aexp
+  | ADiv : aexp -> aexp -> aexp. (* <--- new *)
+
+Inductive aevalR : aexp -> nat -> Prop :=
+  | E_ANum : forall (n : nat), aevalR (ANum n) n
+  | E_APlus : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (APlus e1 e2) (n1 + n2)
+  | E_AMinus : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (AMinus e1 e2) (n1 - n2)
+  | E_AMult : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (AMult e1 e2) (n1 * n2)
+  | E_ADiv : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> n2 > 0 -> aevalR (ADiv e1 e2) (n1 / n2).
+
+(* Relation is more powerful than function definition as how to handle 0 in our `aeval` Fixpoint in this case? *)
+End aevalR_division.
+
+Module aevalR_extended.
+
+(* Suppose, instead, that we want to extend the arithmetic operations by a nondeterministic number generator any that, 
+   when evaluated, may yield any number. *)
+
+Inductive aexp : Type :=
+  | AAny : aexp (* <--- NEW *)
+  | ANum : nat -> aexp
+  | APlus : aexp -> aexp -> aexp
+  | AMinus : aexp -> aexp -> aexp
+  | AMult : aexp -> aexp -> aexp.
+
+Inductive aevalR : aexp -> nat -> Prop :=
+  | E_Any : forall (n:nat),
+      aevalR AAny n (* <--- new *)
+  | E_ANum : forall (n : nat), aevalR (ANum n) n
+  | E_APlus : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (APlus e1 e2) (n1 + n2)
+  | E_AMinus : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (AMinus e1 e2) (n1 - n2)
+  | E_AMult : forall (e1 e2 : aexp) (n1 n2 : nat),
+      aevalR e1 n1 -> aevalR e2 n2 -> aevalR (AMult e1 e2) (n1 * n2).
+
+(* Similarlly we can't use function as the evaluation is not desterministic , but using relation (indproposistion) could acheive this *)
+End aevalR_extended.
