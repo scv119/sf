@@ -128,3 +128,38 @@ Proof.
   - intros H. inversion H.
   - intros H. apply le_S_n in H. apply IHn. apply H.
 Qed.
+
+Definition symmetric {X: Type} (R: relation X) :=
+  forall a b : X, (R a b) -> (R b a).
+
+Theorem le_not_symmetric:
+  ~(symmetric le).
+Proof.
+  unfold symmetric. intros H. assert (1 <= 0) as nonsense. { apply H. repeat constructor. } inversion nonsense.
+Qed.
+
+Definition antisymmetric {X: Type} (R : relation X) :=
+  forall a b : X, (R a b) -> (R b a) -> a = b.
+
+Theorem le_antisymmetric:
+  antisymmetric le.
+Proof.
+  unfold antisymmetric. intros a. induction a.
+  - intros b H1 H2. inversion H2. reflexivity.
+  - intros b H1 H2. destruct b.
+    + inversion H1.
+    + apply f_equal. apply le_S_n in H1. apply le_S_n in H2. apply IHa; assumption.
+Qed.
+
+Theorem le_step : forall n m p,
+  n < m ->
+  m <= S p ->
+  n <= p.
+Proof.
+  intros n m p H1 H2. destruct m.
+  - inversion H1.
+  - unfold lt in H1. apply le_S_n in H1. apply le_S_n in H2. apply le_trans with (b:=m); assumption.
+Qed.
+
+Definition equivalence {X:Type} (R: relation X) :=
+  (reflexive R) /\ (symmetric R) /\ (transitive R).

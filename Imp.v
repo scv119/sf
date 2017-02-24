@@ -325,3 +325,30 @@ Inductive aevalR : aexp -> nat -> Prop :=
 
 (* Similarlly we can't use function as the evaluation is not desterministic , but using relation (indproposistion) could acheive this *)
 End aevalR_extended.
+
+
+Definition state := total_map nat.
+
+Definition empty_state : state :=
+  t_empty 0.
+
+Print id.
+
+Inductive aexp : Type :=
+  | ANum : nat -> aexp
+  | AId : id -> aexp
+  | APlus : aexp -> aexp -> aexp
+  | AMinus : aexp -> aexp -> aexp
+  | AMult : aexp -> aexp -> aexp.
+
+Definition X : id := Id 1.
+Definition Y : id := Id 2.
+Definition Z : id := Id 3.
+
+Inductive bexp : Type :=
+  | BTrue : bexp
+  | BFalse : bexp
+  | BEq : aexp -> aexp -> bexp
+  | BLe : aexp -> aexp -> bexp
+  | BNot : bexp -> bexp
+  | BAnd : bexp -> bexp -> bexp.
