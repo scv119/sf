@@ -511,3 +511,137 @@ Proof.
     + apply E_Ass. reflexivity.
 Qed.
 
+Definition pup_to_n : com :=
+  Y ::= ANum 0 ;;
+  WHILE BNot (BEq (AId X) (ANum 0)) DO
+    Y ::= APlus (AId X) (AId Y) ;;
+    X ::= AMinus (AId X) (ANum 1)
+  END.
+
+Theorem pup_to_2_ceval :
+  pup_to_n / (t_update empty_state X 2) \\
+    t_update (t_update (t_update (t_update (t_update (t_update empty_state
+      X 2) Y 0) Y 2) X 1) Y 3) X 0.
+Proof.
+  apply E_Seq with (t_update (t_update empty_state
+      X 2) Y 0).
+  - apply E_Ass. reflexivity.
+  - apply E_WhileLoop with (t_update (t_update(t_update (t_update empty_state
+      X 2) Y 0) Y 2) X 1).
+    + reflexivity.
+    + apply E_Seq with  (t_update (t_update (t_update empty_state X 2) Y 0) Y 2); apply E_Ass; reflexivity.
+    + apply E_WhileLoop with (t_update (t_update (t_update (t_update (t_update (t_update empty_state
+      X 2) Y 0) Y 2) X 1) Y 3) X 0).
+      * reflexivity.
+      * apply E_Seq with (t_update (t_update (t_update (t_update (t_update empty_state
+      X 2) Y 0) Y 2) X 1) Y 3) ; apply E_Ass; reflexivity.
+      * apply E_WhileEnd. reflexivity.
+Qed.
+
+
+Theorem ceval_deterministic: forall c st st1 st2,
+     c / st \\ st1 ->
+     c / st \\ st2 ->
+     st1 = st2.
+Proof.
+  intros c st st1 st2 E1 E2.
+  generalize dependent st2.
+  induction E1;
+           intros st2 E2; inversion E2; subst.
+  - (* E_Skip *) reflexivity.
+  - (* E_Ass *) reflexivity.
+  - (* E_Seq *)
+    assert (st' = st'0) as EQ1.
+    { (* Proof of assertion *) apply IHE1_1; assumption. }
+    subst st'0.
+    apply IHE1_2. assumption.
+  - (* E_IfTrue, b1 evaluates to true *)
+      apply IHE1. assumption.
+  - (* E_IfTrue,  b1 evaluates to false (contradiction) *)
+      rewrite H in H5. inversion H5.
+  - (* E_IfFalse, b1 evaluates to true (contradiction) *)
+    rewrite H in H5. inversion H5.
+  - (* E_IfFalse, b1 evaluates to false *)
+      apply IHE1. assumption.
+  - (* E_WhileEnd, b1 evaluates to false *)
+    reflexivity.
+  - (* E_WhileEnd, b1 evaluates to true (contradiction) *)
+    rewrite H in H2. inversion H2.
+  - (* E_WhileLoop, b1 evaluates to false (contradiction) *)
+    rewrite H in H4. inversion H4.
+  - (* E_WhileLoop, b1 evaluates to true *)
+      assert (st' = st'0) as EQ1.
+      { (* Proof of assertion *) apply IHE1_1; assumption. }
+      subst st'0.
+      apply IHE1_2. assumption. Qed.
+
+Theorem plus2_spec : forall st n st',
+  st X = n ->
+  plus2 / st \\ st' ->
+  st' X = n + 2.
+Proof.
+  intros st n st' HX Heval.
+  inversion Heval. subst. clear Heval. simpl. apply t_update_eq.
+Qed.
+
+Theorem XtimesYinZ_spec : forall st n m st',
+  st X = n ->
+  st Y = m ->
+  XtimesYinZ / st \\ st' ->
+  st' Z = n * m.
+Proof.
+  intros st n m st' HX HY Heval.
+  inversion Heval. subst. clear Heval. simpl. apply t_update_eq.
+Qed.
+
+Theorem loop_never_stops : forall st st',
+  ~(loop / st \\ st').
+Proof.
+  intros st st' contra. unfold loop in contra.
+  remember (WHILE BTrue DO SKIP END) as loopdef
+           eqn:Heqloopdef.
+  induction contra; try (inversion Heqloopdef).
+  - subst. inversion H.
+  - subst. apply IHcontra2. assumption.
+Qed. 
+
+
+Fixpoint no_whiles (c : com) : bool :=
+  match c with
+  | SKIP =>
+      true
+  | _ ::= _ =>
+      true
+  | c1 ;; c2 =>
+      andb (no_whiles c1) (no_whiles c2)
+  | IFB _ THEN ct ELSE cf FI =>
+      andb (no_whiles ct) (no_whiles cf)
+  | WHILE _ DO _ END =>
+      false
+  end.
+
+Inductive no_whilesR: com -> Prop :=
+  | NW_Skip : no_whilesR SKIP
+  | NW_CAss : forall i a, no_whilesR (i ::= a)
+  | NW_CSeq : forall c1 c2, 
+        no_whilesR c1 -> no_whilesR c2 -> no_whilesR (c1 ;; c2)
+  | NW_CIf  : forall b c1 c2, 
+        no_whilesR c1 -> no_whilesR c2 -> no_whilesR (IFB b THEN c1 ELSE c2 FI).
+
+Theorem no_whiles_eqv:
+   forall c, no_whiles c = true <-> no_whilesR c.
+Proof.
+  split.
+  - induction c; intros H.
+    + constructor.
+    + constructor.
+    + apply andb_true_iff in H. inversion H. apply NW_CSeq; try apply IHc1; try apply IHc2; assumption.
+    + apply andb_true_iff in H. inversion H. apply NW_CIf; try apply IHc1; try apply IHc2; assumption.
+    + inversion H.
+  - induction c; intros H.
+    + constructor.
+    + constructor.
+    + inversion H. apply andb_true_iff. split; try apply IHc1; try apply IHc2; assumption.
+    + inversion H. apply andb_true_iff. split; try apply IHc1; try apply IHc2; assumption.
+    + inversion H.
+Qed.
