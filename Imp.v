@@ -352,3 +352,162 @@ Inductive bexp : Type :=
   | BLe : aexp -> aexp -> bexp
   | BNot : bexp -> bexp
   | BAnd : bexp -> bexp -> bexp.
+
+Fixpoint aeval (st : state) (a: aexp) : nat :=
+  match a with
+  | ANum n => n
+  | AId x => st x
+  | APlus a1 a2 => (aeval st a1) + (aeval st a2)
+  | AMinus a1 a2 => (aeval st a1) - (aeval st a2)
+  | AMult a1 a2 => (aeval st a1) * (aeval st a2)
+  end.
+
+Fixpoint beval (st : state) (b : bexp) : bool :=
+  match b with
+  | BTrue => true
+  | BFalse => false
+  | BEq a1 a2 => beq_nat (aeval st a1) (aeval st a2)
+  | BLe a1 a2 => leb (aeval st a1) (aeval st a2)
+  | BNot b1 => negb (beval st b1)
+  | BAnd b1 b2 => andb (beval st b1) (beval st b2)
+  end.
+
+Example aexpl :
+  aeval (t_update empty_state X 5)
+        (APlus (ANum 3) (AMult (AId X) (ANum 2))) = 13.
+Proof.
+  reflexivity.
+Qed.
+
+Inductive com : Type :=
+  | CSkip : com
+  | CAss : id -> aexp -> com
+  | CSeq : com -> com -> com
+  | CIf : bexp -> com -> com -> com
+  | CWhile : bexp -> com -> com.
+
+Notation "'SKIP'" :=
+  CSkip.
+Notation "x '::=' a" :=
+  (CAss x a) (at level 60).
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'IFB' c1 'THEN' c2 'ELSE' c3 'FI'" :=
+  (CIf c1 c2 c3) (at level 80, right associativity).
+
+
+(* BNF:
+ c ::= SKIP | x ::= a | c ;; c | IFB b THEN c ELSE c FI 
+         | WHILE b DO c END
+*)
+
+Definition fact_in_coq : com :=
+  Z ::= AId X;;
+  Y ::= ANum 1;;
+  WHILE BNot (BEq (AId Z) (ANum 0)) DO
+    Y ::= AMult (AId Y) (AId Z);;
+    Z ::= AMinus (AId Z) (ANum 1)
+  END.
+
+Definition plus2 : com :=
+  X ::= (APlus (AId X) (ANum 2)).
+
+Definition XtimesYinZ : com :=
+  Z ::= (AMult (AId X) (AId Y)).
+
+Definition subtract_slowly_body : com :=
+  Z ::= AMinus (AId Z) (ANum 1) ;;
+  X ::= AMinus (AId Z) (ANum 1).
+
+Definition subtract_slowly : com :=
+  WHILE BNot (BEq (AId X) (ANum 0)) DO
+    subtract_slowly_body
+  END.
+
+Definition subtract_3_from_5_slowly : com :=
+  X ::= ANum 3 ;;
+  Z ::= ANum 5 ;;
+  subtract_slowly.
+
+Definition loop : com :=
+  WHILE BTrue DO
+    SKIP
+  END.
+
+Fixpoint ceval_fun_no_while (st : state) (c : com) : state :=
+  match c with
+  | SKIP => st
+  | x ::= a1 =>
+    t_update st x (aeval st a1)
+  | c1 ;; c2 =>
+      let st' := ceval_fun_no_while st c1 in
+        ceval_fun_no_while st' c2
+  | IFB b THEN c1 ELSE c2 FI =>
+      if (beval st b)
+        then ceval_fun_no_while st c1
+        else ceval_fun_no_while st c2
+  | WHILE b DO c END =>
+      st (* bogus *)
+end.
+(* Coq don't accept non-terminating fuction because of Coq is a consistent logic *)
+
+Reserved Notation "c1 '/' st '\\' st'"
+                  (at level 40, st at level 39).
+Inductive ceval : com -> state -> state -> Prop :=
+  | E_SKip : forall st,
+     SKIP / st \\ st
+  | E_Ass : forall st a1 n x,
+     aeval st a1 = n ->
+     (x ::= a1 ) / st \\ (t_update st x n)
+  | E_Seq : forall c1 c2 st st' st'',
+     c1 / st \\ st' ->
+     c2 / st' \\ st'' ->
+    (c1 ;; c2) / st \\ st''
+  | E_IfTrue : forall st st' b c1 c2,
+    beval st b = true ->
+    c1 / st \\ st' ->
+    (IFB b THEN c1 ELSE c2 FI) / st \\ st'
+  | E_IfFalse : forall st st' b c1 c2,
+    beval st b = false ->
+    c2 / st \\ st' ->
+    (IFB b THEN c1 ELSE c2 FI) / st \\ st'
+  | E_WhileEnd : forall b st c,
+    beval st b = false ->
+    (WHILE b DO c END) / st \\ st
+  | E_WhileLoop : forall st st' st'' b c,
+    beval st b = true ->
+    c / st \\ st' ->
+    (WHILE b DO c END) / st' \\ st'' ->
+    (WHILE b DO c END) / st \\ st''
+
+where "c1 '/' st '\\' st'" := (ceval c1 st st').
+
+Example ceval_example1:
+  (X ::= ANum 2;;
+   IFB BLe (AId X) (ANum 1)
+    THEN Y ::= ANum 3
+    ELSE Z ::= ANum 4
+   FI)
+  / empty_state
+  \\ (t_update (t_update empty_state X 2) Z 4).
+Proof.
+  apply E_Seq with (t_update empty_state X 2).
+  - apply E_Ass. reflexivity.
+  - apply E_IfFalse.
+    + reflexivity.
+    + apply E_Ass. reflexivity.
+Qed.
+
+Example ceval_example2:
+    (X ::= ANum 0;; Y ::= ANum 1;; Z ::= ANum 2) / empty_state \\
+    (t_update (t_update (t_update empty_state X 0) Y 1) Z 2).
+Proof.
+   apply E_Seq with (t_update empty_state X 0).
+   - apply E_Ass. reflexivity.
+   - apply E_Seq with (t_update (t_update empty_state X 0) Y 1).
+    + apply E_Ass. reflexivity.
+    + apply E_Ass. reflexivity.
+Qed.
+
