@@ -645,3 +645,139 @@ Proof.
     + inversion H. apply andb_true_iff. split; try apply IHc1; try apply IHc2; assumption.
     + inversion H.
 Qed.
+
+Theorem no_whiles_terminating: forall com  st1,
+  no_whiles com = true ->
+  exists st2, com / st1 \\ st2.
+Proof.
+  intros com. induction com.
+  - intros st1 H.  exists st1. constructor.
+  - intros st1 H.  exists (t_update st1 i (aeval st1 a)). constructor. reflexivity.
+  - intros st1 H.  inversion H. apply andb_true_iff in H1. inversion H1. 
+    assert (H3: exists st2 : state, com1 / st1 \\ st2).  { apply IHcom1. apply H0. }
+    inversion H3.
+    assert (H5: exists st2 : state, com2 / x \\ st2).  { apply IHcom2. apply H2. }
+    inversion H5.
+    exists x0. apply E_Seq with x. assumption. assumption.
+  - intros st1 H.  inversion H.  apply andb_true_iff in H1. inversion H1.
+    assert (H3: exists st2 : state, com1 / st1 \\ st2).  { apply IHcom1. apply H0. }
+    inversion H3.
+    assert (H5: exists st2 : state, com2 / st1 \\ st2).  { apply IHcom2. apply H2. }
+    inversion H5.
+    destruct (beval st1 b) eqn: H7.
+    + exists x. apply E_IfTrue; assumption.
+    + exists x0. apply E_IfFalse; assumption.
+  - intros st1 H. inversion H.
+Qed.
+
+Inductive sinstr : Type :=
+  | SPush : nat -> sinstr
+  | SLoad : id -> sinstr
+  | SPlus : sinstr
+  | SMinus : sinstr
+  | SMult : sinstr.
+
+Definition s_eval (st : state) (stack : list nat) (inst : sinstr) : list nat :=
+  match inst with
+    | SPush x => x :: stack
+    | SLoad v => st v :: stack
+    | SPlus   => match stack with
+                   | a :: b :: rest => b + a :: rest
+                   | _ => []
+                 end
+    | SMinus  => match stack with
+                   | a :: b :: rest => b - a :: rest
+                   | _ => []
+                 end
+    | SMult   => match stack with
+                   | a :: b :: rest => b * a :: rest
+                   | _ => []
+                 end
+  end.
+
+Fixpoint s_execute (st : state) (stack : list nat)
+                   (prog : list sinstr)
+                 : list nat :=
+  match prog with
+    | [] => stack
+    | inst :: insts =>
+      s_execute st (s_eval st stack inst) insts
+  end.
+
+
+Example s_execute1 :
+     s_execute empty_state []
+       [SPush 5; SPush 3; SPush 1; SMinus]
+   = [2; 5].
+Proof.
+  simpl. reflexivity.
+Qed.
+
+Example s_execute2 :
+     s_execute (t_update empty_state X 3) [3;4]
+       [SPush 4; SLoad X; SMult; SPlus]
+   = [15; 4].
+Proof.
+  reflexivity.
+Qed.
+
+Fixpoint s_compile (e : aexp) : list sinstr :=
+  match e with
+  | ANum a =>  [SPush a]
+  | AId id => [SLoad id]
+  | APlus e1 e2 => s_compile e1 ++ s_compile e2 ++ [SPlus]
+  | AMinus e1 e2 => s_compile e1  ++ s_compile e2 ++ [SMinus]
+  | AMult e1 e2 => s_compile e1 ++ s_compile e2 ++ [SMult]
+    end.
+
+
+Example s_compile1 :
+    s_compile (AMinus (AId X) (AMult (ANum 2) (AId Y)))
+  = [SLoad X; SPush 2; SLoad Y; SMult; SMinus].
+Proof.
+  simpl. reflexivity.
+Qed.
+
+
+Theorem s_append_program : 
+  forall (st : state) (s : sinstr) (prog : list sinstr) (l l1: list nat), 
+    s_execute st l [s] = l1 ->
+    s_execute st l (s :: prog) = s_execute st l1 prog.
+Proof.
+    intros. destruct s; rewrite <- H; try reflexivity.
+Qed.
+
+Theorem s_concat_program :
+  forall (st : state) (prog1 prog2 : list sinstr) (l : list nat),
+    s_execute st l (prog1 ++ prog2) = s_execute st (s_execute st l prog1)  prog2.
+Proof.
+  intros st prog1. generalize dependent st. induction prog1.
+  - intros st prog2 l. simpl. reflexivity.
+  - intros st prog2 l. destruct (s_execute st l [a]) eqn: H.
+    + rewrite <- app_comm_cons. 
+      assert (s_execute st l (a :: prog1 ++ prog2) = s_execute st [] (prog1 ++ prog2)).
+      { apply s_append_program. apply H. } rewrite H0.
+      assert (s_execute st l (a :: prog1) = s_execute st [] prog1).
+      { apply s_append_program. apply H. } rewrite H1.
+      apply IHprog1.
+    + rewrite <- app_comm_cons.
+            assert (s_execute st l (a :: prog1 ++ prog2) = s_execute st (n::l0) (prog1 ++ prog2)).
+      { apply s_append_program. apply H. } rewrite H0.
+      assert (s_execute st l (a :: prog1) = s_execute st (n::l0) prog1).
+      { apply s_append_program. apply H. } rewrite H1.
+      apply IHprog1.
+Qed.
+
+
+
+Lemma s_compile_correct0 : forall (st: state) (e:aexp) (l:list nat),
+  s_execute st l (s_compile e) = aeval st e :: l.
+Proof.
+  intros. generalize dependent l. induction e; try reflexivity; simpl; intros; rewrite s_concat_program; rewrite IHe1; rewrite s_concat_program; rewrite IHe2; reflexivity.
+Qed.
+
+Theorem s_compile_correct : forall (st : state) (e : aexp),
+  s_execute st [] (s_compile e) = [ aeval st e ].
+Proof.
+  intros. apply s_compile_correct0 with (l:=[]).
+Qed.

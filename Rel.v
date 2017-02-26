@@ -163,3 +163,56 @@ Qed.
 
 Definition equivalence {X:Type} (R: relation X) :=
   (reflexive R) /\ (symmetric R) /\ (transitive R).
+
+Definition order {X:Type} (R: relation X) :=
+  (reflexive R) /\ (antisymmetric R) /\ (transitive R).
+
+Definition preorder {X:Type} (R: relation X) :=
+  (reflexive R) /\ (transitive R).
+
+Theorem le_order:
+  order le.
+Proof.
+  unfold order. split.
+  - apply le_reflexive.
+  - split.
+    + apply le_antisymmetric.
+    + apply le_trans. Qed.
+
+Inductive clos_ref_trans {A : Type} (R : relation A) : relation A
+:= 
+  | rt_step : forall x y, R x y -> clos_ref_trans R x y
+  | rt_refl : forall x, clos_ref_trans R x x
+  | rt_trans : forall x y z,
+    clos_ref_trans R x y ->
+    clos_ref_trans R y z ->
+    clos_ref_trans R x z.
+
+Theorem next_nat_closure_is_le : forall n m,
+  (n <= m) <-> ((clos_ref_trans next_nat) n m).
+Proof.
+  split.
+  - intros H. induction H.
+    + apply rt_refl.
+    + apply rt_trans with (y:=m).
+      * assumption.
+      * apply rt_step. constructor.
+  - intros H. induction H.
+    + inversion H. constructor. constructor.
+    + constructor.
+    + apply le_trans with y; assumption.
+Qed.
+
+Inductive clos_refl_trans_1n {A : Type}
+                             (R : relation A) (x : A)
+                             : A -> Prop :=
+  | rt1n_refl : clos_refl_trans_1n R x x
+  | rt1n_trans (y z : A) :
+      R x y -> clos_refl_trans_1n R y z ->
+      clos_refl_trans_1n R x z.
+
+Lemma rsc_R : forall (X:Type) (R:relation X) (x y : X),
+       R x y -> clos_refl_trans_1n R x y.
+Proof.
+  intros. apply rt1n_trans with y. assumption. constructor.
+Qed.
