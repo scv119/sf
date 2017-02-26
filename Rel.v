@@ -179,17 +179,17 @@ Proof.
     + apply le_antisymmetric.
     + apply le_trans. Qed.
 
-Inductive clos_ref_trans {A : Type} (R : relation A) : relation A
+Inductive clos_refl_trans {A : Type} (R : relation A) : relation A
 := 
-  | rt_step : forall x y, R x y -> clos_ref_trans R x y
-  | rt_refl : forall x, clos_ref_trans R x x
+  | rt_step : forall x y, R x y -> clos_refl_trans R x y
+  | rt_refl : forall x, clos_refl_trans R x x
   | rt_trans : forall x y z,
-    clos_ref_trans R x y ->
-    clos_ref_trans R y z ->
-    clos_ref_trans R x z.
+    clos_refl_trans R x y ->
+    clos_refl_trans R y z ->
+    clos_refl_trans R x z.
 
 Theorem next_nat_closure_is_le : forall n m,
-  (n <= m) <-> ((clos_ref_trans next_nat) n m).
+  (n <= m) <-> ((clos_refl_trans next_nat) n m).
 Proof.
   split.
   - intros H. induction H.
@@ -216,3 +216,31 @@ Lemma rsc_R : forall (X:Type) (R:relation X) (x y : X),
 Proof.
   intros. apply rt1n_trans with y. assumption. constructor.
 Qed.
+
+Lemma rsc_trans :
+  forall (X:Type) (R: relation X) (x y z : X),
+      clos_refl_trans_1n R x y ->
+      clos_refl_trans_1n R y z ->
+      clos_refl_trans_1n R x z.
+Proof.
+  intros. induction H.
+  - apply H0.
+  - apply IHclos_refl_trans_1n in H0. apply rt1n_trans with y.
+    + assumption.
+    + assumption.
+Qed.
+
+Theorem rtc_rsc_coincide :
+     forall (X:Type) (R: relation X) (x y : X),
+  clos_refl_trans R x y <-> clos_refl_trans_1n R x y.
+Proof.
+  split.
+  - intros. induction H.
+    + apply rt1n_trans with y. assumption. constructor.
+    + constructor.
+    + apply rsc_trans with y; assumption.
+  - intros. induction H.
+    + apply rt_refl.
+    + apply rt_trans with y. apply rt_step. assumption. assumption.
+Qed.
+    
