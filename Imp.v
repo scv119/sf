@@ -550,7 +550,7 @@ Proof.
            intros st2 E2; inversion E2; subst.
   - (* E_Skip *) reflexivity.
   - (* E_Ass *) reflexivity.
-  - (* E_Seq *)
+  - (* E_Seq *) 
     assert (st' = st'0) as EQ1.
     { (* Proof of assertion *) apply IHE1_1; assumption. }
     subst st'0.
@@ -780,4 +780,171 @@ Theorem s_compile_correct : forall (st : state) (e : aexp),
   s_execute st [] (s_compile e) = [ aeval st e ].
 Proof.
   intros. apply s_compile_correct0 with (l:=[]).
+Qed.
+
+
+Module BreakImp.
+
+Inductive com : Type :=
+  | CSkip : com
+  | CBreak : com 
+  | CAss : id -> aexp -> com
+  | CSeq : com -> com -> com
+  | CIf : bexp -> com -> com -> com
+  | CWhile : bexp -> com -> com.
+
+Notation "'SKIP'" :=
+  CSkip.
+Notation "'BREAK'" :=
+  CBreak.
+Notation "x '::=' a" :=
+  (CAss x a) (at level 60).
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'IFB' c1 'THEN' c2 'ELSE' c3 'FI'" :=
+  (CIf c1 c2 c3) (at level 80, right associativity).
+
+
+Inductive status : Type :=
+  | SContinue : status
+  | SBreak : status.
+
+Reserved Notation "c1 '/' st '\\' s '/' st'"
+                  (at level 40, st, s at level 39).
+Inductive ceval : com -> state -> status -> state -> Prop :=
+  | E_SKip : forall st,
+      CSkip / st \\ SContinue / st
+  | E_Break : forall st,
+      CBreak / st \\ SBreak / st
+  | E_Ass : forall st a1 n x,
+      aeval st a1 = n ->
+      (x ::= a1) / st \\ SContinue / (t_update st x n)
+  | E_IfTrue : forall st st' sta b c1 c2,
+      beval st b = true ->
+      c1 / st \\ sta / st' ->
+      (IFB b THEN c1 ELSE c2 FI) / st \\ sta / st'
+  | E_IfFalse : forall st st' sta b c1 c2,
+      beval st b = false ->
+      c2 / st \\ sta / st' ->
+      (IFB b THEN c1 ELSE c2 FI) / st \\ sta / st'
+  | E_SeqB : forall c1 c2 st st',
+      c1 / st \\ SBreak / st' ->
+      (c1 ;; c2) / st \\ SBreak / st'
+  | E_SeqC : forall c1 c2 status st st' st'',
+      c1 / st \\ SContinue / st' ->
+      c2 / st' \\ status / st'' ->
+      (c1 ;; c2) / st \\ status / st''
+  | E_WhileEnd : forall b st c,
+    beval st b = false ->
+    (WHILE b DO c END) / st \\ SContinue / st
+  | E_WhileLoopC : forall st st' st'' b c,
+    beval st b = true ->
+    c / st \\ SContinue / st' ->
+    (WHILE b DO c END) / st' \\ SContinue / st'' ->
+    (WHILE b DO c END) / st \\ SContinue / st''
+  | E_WhileLoopB : forall st st' b c,
+    beval st b = true ->
+    c / st \\ SBreak / st' ->
+    (WHILE b DO c END) / st \\ SContinue / st'
+
+where "c1 '/' st '\\' s '/' st'" := (ceval c1 st s st').
+
+
+Theorem break_ignore : forall c st st' s,
+     (BREAK;; c) / st \\ s / st' ->
+     st = st'.
+Proof.
+  intros. inversion H.
+  - subst. inversion H5. reflexivity.
+  - subst. inversion H2.
+Qed.
+
+Theorem while_continue : forall b c st st' s,
+  (WHILE b DO c END) / st \\ s / st' ->
+  s = SContinue.
+Proof.
+  intros. inversion H; subst; reflexivity.
+Qed.
+
+Theorem while_stops_on_break : forall b c st st',
+  beval st b = true ->
+  c / st \\ SBreak / st' ->
+  (WHILE b DO c END) / st \\ SContinue / st'.
+Proof.
+  intros. apply E_WhileLoopB; assumption.
+Qed.
+
+Theorem while_break_true : forall b c st st',
+  (WHILE b DO c END) / st \\ SContinue / st' ->
+  beval st' b = true ->
+  exists st'', c / st'' \\  SBreak / st'.
+Proof.
+  intros. remember (WHILE b DO c END) as loop. induction H; try inversion Heqloop.
+  - subst. rewrite H in H0. inversion H0.
+  - subst. apply IHceval2. reflexivity. assumption.
+  - subst. exists st. assumption.
+Qed.
+
+
+Theorem ceval_deterministic: forall (c:com) st st1 st2 s1 s2,
+     c / st \\ s1 / st1 ->
+     c / st \\ s2 / st2 ->
+     st1 = st2 /\ s1 = s2.
+Proof.
+  intros.  generalize dependent st2. generalize dependent s2.
+  induction H.
+  - intros. inversion H0. split; reflexivity.
+  - intros. inversion H0. split; reflexivity.
+  - intros. inversion H0. split; subst; reflexivity.
+  - intros. apply IHceval. inversion H1. subst.
+    + assumption.
+    + subst. rewrite H in H8. inversion H8.
+  - intros. apply IHceval. inversion H1. subst.
+    + subst. rewrite H in H8. inversion H8.
+    + assumption.
+  - intros. inversion H0.
+    + apply IHceval. assumption.
+    + subst. apply IHceval in H3. inversion H3. inversion H2.
+  - intros. inversion H1.
+    + subst. apply IHceval1 in H7. inversion H7. inversion H3.
+    + subst. apply IHceval1 in H4. apply IHceval2. inversion H4. rewrite H2. assumption.
+  - intros. inversion H0.
+    + split; reflexivity.
+    + subst. rewrite H in H3. inversion H3.
+    + rewrite H in H3. inversion H3.
+  - intros. inversion H2.
+    + subst.  rewrite H in H8. inversion H8.
+    + subst. apply IHceval2. apply IHceval1 in H6. inversion H6. rewrite H3. assumption.
+    + subst. apply IHceval1 in H9. inversion H9. inversion H4.
+  - intros. inversion H1.
+    + subst. rewrite H in H7. inversion H7.
+    + subst. apply IHceval in H5. inversion H5. inversion H3.
+    + subst. split.
+      * apply IHceval in H8. inversion H8. assumption.
+      * reflexivity.
+Qed.
+
+End BreakImp.
+
+
+Fixpoint beval' (st : state) (b : bexp) : bool :=
+  match b with
+  | BTrue => true
+  | BFalse =>   false
+  | BEq a1 a2 =>  beq_nat (aeval st a1) (aeval st a2)
+  | BLe a1 a2 => leb (aeval st a1) (aeval st a2)
+  | BNot b1 => negb (beval' st b1)
+  | BAnd b1 b2 => match (beval' st b1) with
+                  | true => beval' st b2
+                  | _ => false
+                  end
+  end.
+
+Theorem short_circuit_eq: forall st b,
+  beval st b = beval' st b.
+Proof.
+  intros. generalize dependent st.
+  induction b; try (intros; reflexivity).
 Qed.

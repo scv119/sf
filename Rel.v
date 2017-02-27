@@ -243,4 +243,4 @@ Proof.
     + apply rt_refl.
     + apply rt_trans with y. apply rt_step. assumption. assumption.
 Qed.
-    
+
