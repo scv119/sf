@@ -456,7 +456,7 @@ end.
 Reserved Notation "c1 '/' st '\\' st'"
                   (at level 40, st at level 39).
 Inductive ceval : com -> state -> state -> Prop :=
-  | E_SKip : forall st,
+  | E_Skip : forall st,
      SKIP / st \\ st
   | E_Ass : forall st a1 n x,
      aeval st a1 = n ->
@@ -814,7 +814,7 @@ Inductive status : Type :=
 Reserved Notation "c1 '/' st '\\' s '/' st'"
                   (at level 40, st, s at level 39).
 Inductive ceval : com -> state -> status -> state -> Prop :=
-  | E_SKip : forall st,
+  | E_Skip : forall st,
       CSkip / st \\ SContinue / st
   | E_Break : forall st,
       CBreak / st \\ SBreak / st
