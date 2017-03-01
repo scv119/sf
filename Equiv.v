@@ -298,3 +298,172 @@ Proof.
     + constructor.
     + rewrite <- H. rewrite t_update_same. reflexivity.
 Qed.
+
+Lemma refl_aequiv : forall(a : aexp), aequiv a a.
+Proof.
+  intros a st. reflexivity. Qed.
+
+Lemma sym_aequiv : forall(a1 a2 : aexp),
+  aequiv a1 a2 -> aequiv a2 a1.
+Proof.
+  intros a1 a2 H. intros st. symmetry. apply H. Qed.
+
+Lemma trans_aequiv : forall(a1 a2 a3 : aexp),
+  aequiv a1 a2 -> aequiv a2 a3 -> aequiv a1 a3.
+Proof.
+  unfold aequiv. intros a1 a2 a3 H12 H23 st.
+  rewrite (H12 st). rewrite (H23 st). reflexivity. Qed.
+
+Lemma refl_bequiv : forall(b : bexp), bequiv b b.
+Proof.
+  unfold bequiv. intros b st. reflexivity. Qed.
+
+Lemma sym_bequiv : forall(b1 b2 : bexp),
+  bequiv b1 b2 -> bequiv b2 b1.
+Proof.
+  unfold bequiv. intros b1 b2 H. intros st. symmetry. apply H. Qed.
+
+Lemma trans_bequiv : forall(b1 b2 b3 : bexp),
+  bequiv b1 b2 -> bequiv b2 b3 -> bequiv b1 b3.
+Proof.
+  unfold bequiv. intros b1 b2 b3 H12 H23 st.
+  rewrite (H12 st). rewrite (H23 st). reflexivity. Qed.
+
+Lemma refl_cequiv : forall(c : com), cequiv c c.
+Proof.
+  unfold cequiv. intros c st st'. apply iff_refl. Qed.
+
+Lemma sym_cequiv : forall(c1 c2 : com),
+  cequiv c1 c2 -> cequiv c2 c1.
+Proof.
+  unfold cequiv. intros c1 c2 H st st'.
+  assert (c1 / st \\ st' <-> c2 / st \\ st') as H'.
+  { (* Proof of assertion *) apply H. }
+  apply iff_sym. assumption.
+Qed.
+
+
+Lemma iff_trans : forall(P1 P2 P3 : Prop),
+  (P1 <-> P2) -> (P2 <-> P3) -> (P1 <-> P3).
+Proof.
+  intros P1 P2 P3 H12 H23.
+  inversion H12. inversion H23.
+  split; intros A.
+    apply H1. apply H. apply A.
+    apply H0. apply H2. apply A. Qed.
+
+Lemma trans_cequiv : forall(c1 c2 c3 : com),
+  cequiv c1 c2 -> cequiv c2 c3 -> cequiv c1 c3.
+Proof.
+  unfold cequiv. intros c1 c2 c3 H12 H23 st st'.
+  apply iff_trans with (c2 / st \\ st'). apply H12. apply H23. Qed.
+
+
+Theorem CAss_congruence : forall i a1 a1',
+  aequiv a1 a1' ->
+  cequiv (CAss i a1) (CAss i a1').
+Proof.
+  intros i a1 a2 Heqv st st'.
+  split; intros Hceval.
+  - (* -> *)
+    inversion Hceval. subst. apply E_Ass.
+    rewrite Heqv. reflexivity.
+  - (* <- *)
+    inversion Hceval. subst. apply E_Ass.
+    rewrite Heqv. reflexivity. Qed.
+
+
+Theorem CWhile_congruence : forall b1 b1' c1 c1',
+  bequiv b1 b1' -> cequiv c1 c1' ->
+  cequiv (WHILE b1 DO c1 END) (WHILE b1' DO c1' END).
+Proof.
+  (* WORKED IN CLASS *)
+  unfold bequiv,cequiv.
+  intros b1 b1' c1 c1' Hb1e Hc1e st st'.
+  split; intros Hce.
+  - (* -> *)
+    remember (WHILE b1 DO c1 END) as cwhile
+      eqn:Heqcwhile.
+    induction Hce; inversion Heqcwhile; subst.
+    + (* E_WhileEnd *)
+      apply E_WhileEnd. rewrite <- Hb1e. apply H.
+    + (* E_WhileLoop *)
+      apply E_WhileLoop with (st' := st').
+      * (* show loop runs *) rewrite <- Hb1e. apply H.
+      * (* body execution *)
+        apply (Hc1e st st'). apply Hce1.
+      * (* subsequent loop execution *)
+        apply IHHce2. reflexivity.
+  - (* <- *)
+    remember (WHILE b1' DO c1' END) as c'while
+      eqn:Heqc'while.
+    induction Hce; inversion Heqc'while; subst.
+    + (* E_WhileEnd *)
+      apply E_WhileEnd. rewrite -> Hb1e. apply H.
+    + (* E_WhileLoop *)
+      apply E_WhileLoop with (st' := st').
+      * (* show loop runs *) rewrite -> Hb1e. apply H.
+      * (* body execution *)
+        apply (Hc1e st st'). apply Hce1.
+      * (* subsequent loop execution *)
+        apply IHHce2. reflexivity. Qed.
+
+
+Theorem CSeq_congruence : forall c1 c1' c2 c2',
+  cequiv c1 c1' -> cequiv c2 c2' ->
+  cequiv (c1;;c2) (c1';;c2').
+Proof.
+  unfold cequiv. intros.
+  split; intros Hce.
+  - inversion Hce; subst.
+    apply E_Seq with st'0. 
+    + apply H. assumption.
+    + apply H0. assumption.
+  - inversion Hce; subst.
+    apply E_Seq with st'0. 
+    + apply H. assumption.
+    + apply H0. assumption.
+Qed.
+
+Theorem CIf_congruence : forall b b' c1 c1' c2 c2',
+  bequiv b b' -> cequiv c1 c1' -> cequiv c2 c2' ->
+  cequiv (IFB b THEN c1 ELSE c2 FI)
+         (IFB b' THEN c1' ELSE c2' FI).
+Proof.
+  unfold bequiv, cequiv. intros.
+  split; intros Hce.
+  - inversion Hce. subst.
+    + apply E_IfTrue. rewrite H in H7. assumption. apply H0 in H8. assumption.
+    + apply E_IfFalse. rewrite H in H7. assumption. apply H1 in H8. assumption.
+   - inversion Hce. subst.
+    + apply E_IfTrue. rewrite <- H in H7. assumption. apply H0 in H8. assumption.
+    + apply E_IfFalse. rewrite <- H in H7. assumption. apply H1 in H8. assumption.
+Qed.
+  
+
+Example congruence_example:
+  cequiv
+    (* Program 1: *)
+    (X ::= ANum 0;;
+     IFB (BEq (AId X) (ANum 0))
+     THEN
+       Y ::= ANum 0
+     ELSE
+       Y ::= ANum 42
+     FI)
+    (* Program 2: *)
+    (X ::= ANum 0;;
+     IFB (BEq (AId X) (ANum 0))
+     THEN
+       Y ::= AMinus (AId X) (AId X) (* <--- changed here *)
+     ELSE
+       Y ::= ANum 42
+     FI).
+Proof.
+  apply CSeq_congruence.
+  apply refl_cequiv.
+  apply CIf_congruence.
+  apply refl_bequiv.
+   apply CAss_congruence. unfold aequiv. simpl. symmetry. omega.
+  apply refl_cequiv.
+Qed.
