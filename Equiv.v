@@ -467,3 +467,106 @@ Proof.
    apply CAss_congruence. unfold aequiv. simpl. symmetry. omega.
   apply refl_cequiv.
 Qed.
+
+Definition atrans_sound (atrans : aexp -> aexp) : Prop :=
+  forall (a: aexp),
+    aequiv a (atrans a).
+
+Definition btrans_sound (btrans : bexp -> bexp) : Prop :=
+  forall (b: bexp),
+    bequiv b (btrans b).
+
+Definition ctrans_sound (ctrans : com -> com) : Prop :=
+  forall (c: com),
+    cequiv c (ctrans c).
+
+Fixpoint fold_constants_aexp (a : aexp) : aexp :=
+  match a with
+  | ANum n => ANum n
+  | AId i => AId i
+  | APlus a1 a2 =>
+    match (fold_constants_aexp a1, fold_constants_aexp a2)
+    with
+    | (ANum n1, ANum n2) => ANum (n1 + n2)
+    | (a1', a2') => APlus a1' a2'
+    end
+  | AMinus a1 a2 =>
+    match (fold_constants_aexp a1, fold_constants_aexp a2)
+    with
+    | (ANum n1, ANum n2) => ANum (n1 - n2)
+    | (a1', a2') => AMinus a1' a2'
+    end
+  | AMult a1 a2 =>
+    match (fold_constants_aexp a1, fold_constants_aexp a2)
+    with
+    | (ANum n1, ANum n2) => ANum (n1 * n2)
+    | (a1', a2') => AMult a1' a2'
+    end
+  end.
+
+Example fold_aexp_ex1 :
+    fold_constants_aexp
+      (AMult (APlus (ANum 1) (ANum 2)) (AId X))
+  = AMult (ANum 3) (AId X).
+Proof. reflexivity. Qed.
+
+Fixpoint fold_constants_bexp (b : bexp) : bexp :=
+  match b with
+  | BTrue => BTrue
+  | BFalse => BFalse
+  | BEq a1 a2 =>
+    match (fold_constants_aexp a1, fold_constants_aexp a2)
+    with
+    | (ANum n1, ANum n2) =>
+        if beq_nat n1 n2 then BTrue else BFalse
+    | (a1', a2') =>
+        BEq a1' a2'
+    end
+  | BLe a1 a2 =>
+    match (fold_constants_aexp a1, fold_constants_aexp a2)
+    with
+    | (ANum n1, ANum n2) =>
+        if leb n1 n2 then BTrue else BFalse
+    | (a1', a2') =>
+        BLe a1' a2'
+    end
+  | BNot b1 =>
+    match (fold_constants_bexp b1) with
+    | BTrue => BFalse
+    | BFalse => BTrue
+    | b1' => BNot b1'
+    end
+  | BAnd b1 b2 =>
+    match (fold_constants_bexp b1, fold_constants_bexp b2)
+    with
+    | (BTrue, BTrue) => BTrue
+    | (BTrue, BFalse) => BFalse
+    | (BFalse, BTrue) => BFalse
+    | (BFalse, BFalse) => BFalse
+    | (b1', b2') => BAnd b1' b2'
+    end
+  end.
+
+Fixpoint fold_constants_com (c : com) : com :=
+  match c with
+  | SKIP =>
+      SKIP
+  | i ::= a =>
+      CAss i (fold_constants_aexp a)
+  | c1 ;; c2 =>
+      (fold_constants_com c1) ;; (fold_constants_com c2)
+  | IFB b THEN c1 ELSE c2 FI =>
+      match fold_constants_bexp b with
+      | BTrue => fold_constants_com c1
+      | BFalse => fold_constants_com c2
+      | b' => IFB b' THEN fold_constants_com c1
+                     ELSE fold_constants_com c2 FI
+      end
+  | WHILE b DO c END =>
+      match fold_constants_bexp b with
+      | BTrue => WHILE BTrue DO SKIP END
+      | BFalse => SKIP
+      | b' => WHILE b' DO (fold_constants_com c) END
+      end
+  end.
+
