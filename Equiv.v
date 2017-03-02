@@ -128,6 +128,27 @@ Proof.
   - (* <- *)
     apply E_IfTrue. reflexivity. assumption. Qed.
 
+Theorem IFB_true: forall b c1 c2,
+     bequiv b BTrue ->
+     cequiv
+       (IFB b THEN c1 ELSE c2 FI)
+       c1.
+Proof.
+  intros b c1 c2 Hb.
+  split; intros H.
+  - (* -> *)
+    inversion H; subst.
+    + (* b evaluates to true *)
+      assumption.
+    + (* b evaluates to false (contradiction) *)
+      unfold bequiv in Hb. simpl in Hb.
+      rewrite Hb in H5.
+      inversion H5.
+  - (* <- *)
+    apply E_IfTrue; try assumption.
+    unfold bequiv in Hb. simpl in Hb.
+    rewrite Hb. reflexivity. Qed.
+
 Theorem IFB_false: forall b c1 c2,
   bequiv b BFalse ->
   cequiv (IFB b THEN c1 ELSE c2 FI)
@@ -570,3 +591,81 @@ Fixpoint fold_constants_com (c : com) : com :=
       end
   end.
 
+Theorem fold_constants_aexp_sound:
+  atrans_sound fold_constants_aexp.
+Proof.
+  unfold atrans_sound. intros a. unfold aequiv. intros st.
+  induction a; simpl; try reflexivity;
+      try (destruct (fold_constants_aexp a1);
+         destruct (fold_constants_aexp a2);
+         rewrite IHa1; rewrite IHa2; reflexivity). Qed.
+
+
+
+Theorem fold_constants_bexp_sound:
+  btrans_sound fold_constants_bexp.
+Proof.
+  unfold btrans_sound. intros b. unfold bequiv. intros st.
+  induction b;
+    (* BTrue and BFalse are immediate *)
+    try reflexivity.
+  - (* BEq *) 
+    rename a into a1. rename a0 into a2. simpl.
+    remember (fold_constants_aexp a1) as a1' eqn:Heqa1'.
+    remember (fold_constants_aexp a2) as a2' eqn:Heqa2'.
+    replace (aeval st a1) with (aeval st a1') by
+       (subst a1'; rewrite <- fold_constants_aexp_sound; reflexivity).
+    replace (aeval st a2) with (aeval st a2') by
+       (subst a2'; rewrite <- fold_constants_aexp_sound; reflexivity).
+    destruct a1'; destruct a2'; try reflexivity.
+    simpl. destruct (beq_nat n n0); reflexivity.
+  - (* BLe *)
+    simpl. 
+    remember (fold_constants_aexp a) as a' eqn:Heqa.
+    remember (fold_constants_aexp a0) as a0' eqn:Heqa0.
+    replace (aeval st a) with (aeval st a') by 
+        (subst a'; rewrite <-  fold_constants_aexp_sound; reflexivity).
+    replace (aeval st a0) with (aeval st a0') by 
+        (subst a0'; rewrite <-  fold_constants_aexp_sound; reflexivity).
+    destruct a'; destruct a0'; try reflexivity.
+    simpl. destruct (n <=? n0); reflexivity.
+  - (* BNot *)
+    simpl. remember (fold_constants_bexp b) as b' eqn:Heqb'.
+    rewrite IHb.
+    destruct b'; reflexivity.
+  - (* BAnd *)
+    simpl.
+    remember (fold_constants_bexp b1) as b1' eqn:Heqb1'.
+    remember (fold_constants_bexp b2) as b2' eqn:Heqb2'.
+    rewrite IHb1. rewrite IHb2.
+    destruct b1'; destruct b2'; reflexivity.
+Qed.
+
+Theorem fold_constants_com_sound :
+  ctrans_sound fold_constants_com.
+Proof.
+  unfold ctrans_sound. intros c.
+  induction c; simpl.
+  - (* SKIP *) apply refl_cequiv.
+  - (* ::= *) apply CAss_congruence.
+              apply fold_constants_aexp_sound.
+  - (* ;; *) apply CSeq_congruence; assumption.
+  - (* IFB *)
+    assert (bequiv b (fold_constants_bexp b)). {
+      apply fold_constants_bexp_sound. }
+    destruct (fold_constants_bexp b) eqn:Heqb;
+      try (apply CIf_congruence; assumption).
+    + (* b always true *)
+      apply trans_cequiv with c1; try assumption.
+      apply IFB_true; assumption.
+    + (* b always false *)
+      apply trans_cequiv with c2; try assumption.
+      apply IFB_false; assumption.
+  - (* WHILE *)
+       assert (bequiv b (fold_constants_bexp b)). {
+      apply fold_constants_bexp_sound. }
+      destruct (fold_constants_bexp b) eqn:Heqb;
+      try (apply CWhile_congruence; assumption).
+      + apply WHILE_true. assumption.
+      + apply WHILE_false. assumption.
+Qed.
