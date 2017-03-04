@@ -959,3 +959,77 @@ Proof.
     SearchAbout t_update. assert (X <> Y). { intros H'. inversion H'. }  apply t_update_permute with (X:=nat) (v1:=n) (v2:=n0) (m:=st) in H0 .
     rewrite <- H0. apply E_Seq with (t_update st X n0); constructor.
 Qed.
+
+Definition ptwice :=
+  HAVOC X;; HAVOC Y.
+
+Definition pcopy :=
+  HAVOC X;; Y ::= AId X.
+
+Lemma ptwice_cequiv_pcopy_lemma: forall A B a st st1 n,
+  A<>B -> (A ::= a) / st \\ st1 -> st1 B = n -> st B = n.
+Proof.
+  intros. remember (A ::= a) as ass. induction H0; try inversion Heqass.
+  subst. symmetry. apply t_update_neq. assumption.
+Qed.
+
+Lemma ptwice_cequiv_pcopy_lemma1: forall A B st st1 n,
+  (A ::= AId B) / st \\ st1 -> st1 A = n -> st B = n.
+Proof.
+  intros. remember (A ::= AId B) as ass. induction H;try inversion Heqass. 
+  subst. unfold aeval. symmetry.  apply t_update_eq.
+Qed.
+
+Theorem ptwice_cequiv_pcopy :
+  ~cequiv ptwice pcopy.
+Proof.
+  unfold cequiv. intros Contra.
+  assert (ptwice / empty_state \\ (t_update (t_update empty_state X 1) Y 2))
+  by ( apply E_Seq with (t_update empty_state X 1); constructor ).
+  apply Contra in H. clear Contra. inversion H. subst. 
+  remember  ( t_update (t_update empty_state X 1) Y 2) as st.
+  assert (X <> Y). { intros H'. inversion H'. }
+  assert (Y <> X). { intros H'. inversion H'. }
+  assert (st =  t_update (t_update empty_state Y 2) X 1). { rewrite Heqst. apply t_update_permute. assumption. }
+  assert (st X = 1). { rewrite H3. apply t_update_eq. }
+  assert (st Y = 2). { rewrite Heqst. apply t_update_eq. }
+  assert (st' X = 1). { apply ptwice_cequiv_pcopy_lemma with (A:=Y) (a:=(AId X)) (st1:=st); assumption. }
+  assert (st' X = 2). { apply ptwice_cequiv_pcopy_lemma1 with (A:=Y) (st1:=st); assumption. }
+  rewrite  H7 in H8. inversion H8.
+Qed.
+
+Definition p1 : com :=
+  WHILE (BNot (BEq (AId X) (ANum 0))) DO
+    HAVOC Y;;
+    X ::= APlus (AId X) (ANum 1)
+  END.
+
+Definition p2 : com :=
+  WHILE (BNot (BEq (AId X) (ANum 0))) DO
+    SKIP
+  END.
+
+Lemma p1_may_diverge : forall st st', st X <>0 ->
+  ~ p1 / st \\ st'.
+Proof.
+  intros. intros Contra. remember p1. induction Contra; subst; inversion Heqc.
+  - rewrite H2 in H0. simpl in H0. rewrite negb_false_iff in H0. apply H. apply beq_nat_true in H0. assumption.
+  - apply IHContra2. 
+    + rewrite H3 in Contra1. inversion Contra1. subst. remember (st X) as m.
+      assert (Y <> X). { intros H'. inversion H'. }
+      assert (st'0 X  = m). { remember (HAVOC Y) as hav. induction H5; try inversion Heqhav. subst. apply t_update_neq; assumption. }
+      assert (st' X = S m). { remember (X ::= APlus (AId X) (ANum 1)) as apl. induction H8; try inversion Heqapl. subst. simpl.
+                              rewrite H2. SearchAbout plus. replace (st X + 1) with (S (st X)) by omega. apply t_update_eq. }
+      rewrite H3. intros H'. inversion H'.
+    + assumption.
+Qed.
+
+Lemma p2_may_diverge : forall st st', st X <>0 ->
+  ~ p2 / st \\ st'.
+Proof.
+  intros. intros Contra. remember p2. induction Contra; subst; inversion Heqc.
+  - rewrite H2 in H0. simpl in H0. rewrite negb_false_iff in H0. apply H. apply beq_nat_true in H0. assumption.
+  - apply IHContra2. 
+    + destruct Contra1; try inversion H3. assumption.
+    + assumption.
+Qed.
