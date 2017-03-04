@@ -1033,3 +1033,45 @@ Proof.
     + destruct Contra1; try inversion H3. assumption.
     + assumption.
 Qed.
+
+Lemma p1_lemma: forall st st', st X = 0 ->
+  p1 / st \\ st' -> st = st'.
+Proof.
+  intros. remember p1. destruct H0; subst; inversion Heqc.
+  - reflexivity.
+  -  rewrite H2 in H0. simpl in H0. rewrite H in H0. inversion H0.
+Qed.
+
+Lemma p2_lemma: forall st st', st X = 0 ->
+  p2 / st \\ st' -> st = st'.
+Proof.
+  intros. remember p2. destruct H0; subst; inversion Heqc.
+  - reflexivity.
+  -  rewrite H2 in H0. simpl in H0. rewrite H in H0. inversion H0.
+Qed.
+
+Lemma p1_lemma1: forall st, st X = 0 ->
+  p1 / st \\ st.
+Proof.
+  intros. unfold p1. apply E_WhileEnd. simpl. rewrite H. reflexivity.
+Qed.
+
+Lemma p2_lemma1: forall st, st X = 0 ->
+  p2 / st \\ st.
+Proof.
+  intros. unfold p2. apply E_WhileEnd. simpl. rewrite H. reflexivity.
+Qed.
+
+Theorem p1_p2_equiv : cequiv p1 p2.
+Proof.
+  unfold cequiv. intros st st'. remember (st X) as n. destruct n eqn:H.
+  + symmetry in Heqn. split.
+    - intros. assert (st = st'). { apply p1_lemma; assumption. }
+      rewrite <- H1. apply p2_lemma1. assumption.
+    - intros. assert (st = st') by ( apply p2_lemma; assumption).
+      rewrite <- H1. apply p1_lemma1. assumption.
+  + assert (st X <>0) by ( intros H1; rewrite <- Heqn in H1; inversion H1).
+    split.
+    - intros H1. exfalso. apply p1_may_diverge with (st':=st') in H0. apply H0. assumption.
+    - intros H1. exfalso. apply p2_may_diverge with (st':=st') in H0. apply H0. assumption.
+Qed.
