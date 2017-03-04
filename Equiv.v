@@ -435,7 +435,7 @@ Theorem CSeq_congruence : forall c1 c1' c2 c2',
   cequiv (c1;;c2) (c1';;c2').
 Proof.
   unfold cequiv. intros.
-  split; intros Hce.
+  split; intros Hce. 
   - inversion Hce; subst.
     apply E_Seq with st'0. 
     + apply H. assumption.
@@ -740,4 +740,222 @@ Proof.
   - apply CSeq_congruence; assumption.
   - apply CIf_congruence; try apply optimize_0plus_bexp_sound; assumption.
   - apply CWhile_congruence; try apply optimize_0plus_bexp_sound; assumption.
+Qed.
+
+Definition double_optimize (c: com) : com :=
+  optimize_0plus_com (fold_constants_com c).
+
+Theorem double_optimize_sound :
+  ctrans_sound double_optimize.
+Proof.
+  unfold ctrans_sound. unfold double_optimize.
+  intros. apply trans_cequiv with (fold_constants_com c).
+  apply fold_constants_com_sound.
+  apply optimize_0plus_com_sound.
+Qed.
+
+
+Fixpoint subst_aexp (i : id) (u : aexp) (a : aexp) : aexp :=
+  match a with
+  | ANum n =>
+      ANum n
+  | AId i' =>
+      if beq_id i i' then u else AId i'
+  | APlus a1 a2 =>
+      APlus (subst_aexp i u a1) (subst_aexp i u a2)
+  | AMinus a1 a2 =>
+      AMinus (subst_aexp i u a1) (subst_aexp i u a2)
+  | AMult a1 a2 =>
+      AMult (subst_aexp i u a1) (subst_aexp i u a2)
+  end.
+
+
+Definition subst_equiv_property := forall i1 i2 a1 a2,
+  cequiv (i1 ::= a1;; i2 ::= a2)
+         (i1 ::= a1;; i2 ::= subst_aexp i1 a1 a2).
+
+Theorem subst_inequiv : 
+  ~ subst_equiv_property.
+Proof.
+  unfold subst_equiv_property.
+  intros Contra. 
+
+  (* Here is the counterexample: assuming that subst_equiv_property
+     holds allows us to prove that these two programs are
+     equivalent... *)
+  remember (X ::= APlus (AId X) (ANum 1);;
+            Y ::= AId X)
+      as c1.
+  remember (X ::= APlus (AId X) (ANum 1);;
+            Y ::= APlus (AId X) (ANum 1))
+      as c2.
+  assert (cequiv c1 c2) by (subst; apply Contra).
+
+  (* ... allows us to show that the command c2 can terminate
+     in two different final states:
+        st1 = {X |-> 1, Y |-> 1}
+        st2 = {X |-> 1, Y |-> 2}. *)
+  remember (t_update (t_update empty_state X 1) Y 1) as st1.
+  remember (t_update (t_update empty_state X 1) Y 2) as st2.
+  assert (H1: c1 / empty_state \\ st1);
+  assert (H2: c2 / empty_state \\ st2);
+  try (subst;
+       apply E_Seq with (st' := (t_update empty_state X 1));
+       apply E_Ass; reflexivity).
+  apply H in H1.
+
+  (* Finally, we use the fact that evaluation is deterministic
+     to obtain a contradiction. *)
+  assert (Hcontra: st1 = st2)
+    by (apply (ceval_deterministic c2 empty_state); assumption).
+  assert (Hcontra': st1 Y = st2 Y)
+    by (rewrite Hcontra; reflexivity).
+  subst. inversion Hcontra'. Qed.
+
+Inductive var_not_used_in_aexp (X:id) : aexp -> Prop :=
+  | VNUNum: forall n, var_not_used_in_aexp X (ANum n)
+  | VNUId: forall Y, X <> Y -> var_not_used_in_aexp X (AId Y)
+  | VNUPlus: forall a1 a2,
+      var_not_used_in_aexp X a1 ->
+      var_not_used_in_aexp X a2 ->
+      var_not_used_in_aexp X (APlus a1 a2)
+  | VNUMinus: forall a1 a2,
+      var_not_used_in_aexp X a1 ->
+      var_not_used_in_aexp X a2 ->
+      var_not_used_in_aexp X (AMinus a1 a2)
+  | VNUMult: forall a1 a2,
+      var_not_used_in_aexp X a1 ->
+      var_not_used_in_aexp X a2 ->
+      var_not_used_in_aexp X (AMult a1 a2).
+
+Lemma aeval_weakening : forall i st a ni,
+  var_not_used_in_aexp i a ->
+  aeval (t_update st i ni) a = aeval st a.
+Proof.
+  intros. induction H; try reflexivity;
+    try (simpl; rewrite IHvar_not_used_in_aexp1; rewrite IHvar_not_used_in_aexp2; reflexivity).
+  - simpl. unfold t_update. destruct beq_id eqn:Heqn.
+    + exfalso. apply H. apply beq_id_true_iff. assumption.
+    + reflexivity. unfold empty_state in H0.
+Qed.
+
+
+Theorem subst_equiv_property' : forall i1 i2 a1 a2,
+  var_not_used_in_aexp i1 a1 ->
+  cequiv (i1 ::= a1;; i2 ::= a2)
+         (i1 ::= a1;; i2 ::= subst_aexp i1 a1 a2).
+Proof.
+  intros. intros st st'. split.
+  - intros H1. inversion H1. subst. apply E_Seq with st'0. assumption.  clear H1.  
+    generalize dependent st'.
+    generalize dependent st'0.    
+    induction a2. 
+    + intros. simpl. assumption.
+    + intros. simpl. destruct (beq_id i1 i) eqn: Heqn.
+      * simpl.  apply beq_id_true_iff in Heqn. subst i. inversion H3. subst.  remember (aeval st a1) as n.
+        remember  ( t_update st i1 n) as st1.
+        assert ( (i2 ::= AId i1) / st1 \\ t_update st1 i2 n). { apply E_Ass. rewrite Heqst1. simpl. apply t_update_eq. }
+        assert (st' = t_update st1 i2 n) by (apply (ceval_deterministic (i2 ::= AId i1) st1); assumption).
+        rewrite H1. apply E_Ass. rewrite Heqn. rewrite Heqst1. apply aeval_weakening. assumption.
+      * simpl. assumption.
+    + intros. simpl.  (* OH GOD *)
+Admitted.
+
+Theorem inequiv_exerices:
+  ~ cequiv (WHILE BTrue DO SKIP END) SKIP.
+Proof.
+  unfold cequiv. intros Contra.
+  assert (SKIP / empty_state \\ empty_state). { apply E_Skip. }
+  apply Contra in H. remember (WHILE BTrue DO SKIP END) as loop. 
+  clear Contra. 
+  induction H; inversion Heqloop.
+  + subst. inversion H.
+  + subst. apply IHceval2. reflexivity.
+Qed.
+  
+    
+Module Himp.
+
+Inductive com : Type :=
+  | CSkip : com
+  | CAss : id -> aexp -> com
+  | CSeq : com -> com -> com
+  | CIf : bexp -> com -> com -> com
+  | CWhile : bexp -> com -> com
+  | CHavoc : id -> com. (* <---- new *)
+
+Notation "'SKIP'" :=
+  CSkip.
+Notation "X '::=' a" :=
+  (CAss X a) (at level 60).
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'IFB' e1 'THEN' e2 'ELSE' e3 'FI'" :=
+  (CIf e1 e2 e3) (at level 80, right associativity).
+Notation "'HAVOC' l" := (CHavoc l) (at level 60).
+
+Reserved Notation "c1 '/' st '\\' st'"
+                  (at level 40, st at level 39).
+
+Inductive ceval : com -> state -> state -> Prop :=
+  | E_Skip : forall st : state, SKIP / st \\ st
+  | E_Ass : forall (st : state) (a1 : aexp) (n : nat) (X : id),
+      aeval st a1 = n ->
+      (X ::= a1) / st \\ t_update st X n
+  | E_Seq : forall (c1 c2 : com) (st st' st'' : state),
+      c1 / st \\ st' ->
+      c2 / st' \\ st'' ->
+      (c1 ;; c2) / st \\ st''
+  | E_IfTrue : forall (st st' : state) (b1 : bexp) (c1 c2 : com),
+      beval st b1 = true ->
+      c1 / st \\ st' ->
+      (IFB b1 THEN c1 ELSE c2 FI) / st \\ st'
+  | E_IfFalse : forall (st st' : state) (b1 : bexp) (c1 c2 : com),
+      beval st b1 = false ->
+      c2 / st \\ st' ->
+      (IFB b1 THEN c1 ELSE c2 FI) / st \\ st'
+  | E_WhileEnd : forall (b1 : bexp) (st : state) (c1 : com),
+      beval st b1 = false -> 
+      (WHILE b1 DO c1 END) / st \\ st
+  | E_WhileLoop : forall (st st' st'' : state) (b1 : bexp) (c1 : com),
+      beval st b1 = true ->
+      c1 / st \\ st' ->
+      (WHILE b1 DO c1 END) / st' \\ st'' ->
+      (WHILE b1 DO c1 END) / st \\ st''
+  | E_Havoc : forall (st : state) (n : nat) (X : id),
+      (HAVOC X) / st \\ t_update st X n
+
+  where "c1 '/' st '\\' st'" := (ceval c1 st st').
+
+Example havoc_example1 : (HAVOC X) / empty_state \\ t_update empty_state X 0.
+Proof.
+apply E_Havoc.
+Qed.
+
+Example havoc_example2 :
+  (SKIP;; HAVOC Z) / empty_state \\ t_update empty_state Z 42.
+Proof.
+apply E_Seq with empty_state; constructor. Qed.
+
+Definition cequiv (c1 c2 : com) : Prop := forall st st' : state,
+  c1 / st \\ st' <-> c2 / st \\ st'.
+
+Definition pXY :=
+  HAVOC X;; HAVOC Y.
+
+Definition pYX :=
+  HAVOC Y;; HAVOC X.
+
+Theorem pXY_cequiv_pYX :
+  cequiv pXY pYX.
+Proof.
+  unfold cequiv. intros st st''. split.
+  - intros H. inversion H; subst. inversion H2. subst. inversion H5. subst.
+    SearchAbout t_update. assert (X <> Y). { intros H'. inversion H'. }  apply t_update_permute with (X:=nat) (v1:=n0) (v2:=n) (m:=st) in H0 .
+    rewrite H0. apply E_Seq with (t_update st Y n0); constructor.
+  -  intros H. inversion H; subst. inversion H2. subst. inversion H5. subst.
+    SearchAbout t_update. assert (X <> Y). { intros H'. inversion H'. }  apply t_update_permute with (X:=nat) (v1:=n) (v2:=n0) (m:=st) in H0 .
+    rewrite <- H0. apply E_Seq with (t_update st X n0); constructor.
 Qed.
