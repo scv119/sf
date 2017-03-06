@@ -1075,3 +1075,190 @@ Proof.
     - intros H1. exfalso. apply p1_may_diverge with (st':=st') in H0. apply H0. assumption.
     - intros H1. exfalso. apply p2_may_diverge with (st':=st') in H0. apply H0. assumption.
 Qed.
+
+Definition p3 : com :=
+  Z ::= ANum 1;;
+  WHILE (BNot (BEq (AId X) (ANum 0))) DO
+    HAVOC X;;
+    HAVOC Z
+  END.
+
+Definition p4 : com :=
+  X ::= (ANum 0);;
+  Z ::= (ANum 1).
+
+Theorem p3_p4_inequiv : ~ cequiv p3 p4.
+Proof.
+  unfold cequiv. intros contra.
+  assert (p3 / (t_update empty_state X 1) \\ (t_update (t_update (t_update (t_update empty_state X 1) Z 1) X 0) Z 2)).
+  {
+    apply E_Seq with (t_update (t_update empty_state X 1) Z 1). apply E_Ass. reflexivity.
+    apply E_WhileLoop with ( t_update (t_update (t_update (t_update empty_state X 1) Z 1) X 0) Z 2).
+    reflexivity.
+    apply E_Seq with  (t_update (t_update (t_update empty_state X 1) Z 1) X 0); constructor.
+    apply E_WhileEnd. reflexivity.
+  }
+  remember (t_update (t_update (t_update (t_update empty_state X 1) Z 1) X 0) Z 2) as st1.
+   apply contra in H. inversion H.
+  assert (st1 Z = 1). {
+    remember (Z ::= ANum 1) as zass. destruct H5; inversion Heqzass. subst. simpl. apply t_update_eq.
+  }
+  assert (st1 Z = 2). { rewrite Heqst1. apply t_update_eq. }
+  rewrite H6 in H7. inversion H7.
+Qed.
+
+
+Definition p5 : com :=
+  WHILE (BNot (BEq (AId X) (ANum 1))) DO
+    HAVOC X
+  END.
+
+Definition p6 : com :=
+  X ::= ANum 1.
+
+Lemma p5_may_terminate: forall s, p5 / s \\ t_update s X 1.
+Proof.
+  intros. destruct (beq_nat (s X) 1) eqn:Heq.
+  - assert (s  = t_update s X 1). 
+    { apply functional_extensionality. intros x. destruct (beq_id x X) eqn:Heq1.
+      {  assert ( s X = 1 ). { apply beq_nat_true in Heq. assumption. } apply beq_id_true_iff in Heq1. subst x.
+         rewrite H. symmetry. apply t_update_eq.
+      }
+      {
+         apply beq_id_false_iff in Heq1. symmetry. apply t_update_neq. intros H. apply Heq1. symmetry. assumption.
+      }
+    }
+    rewrite <- H. apply E_WhileEnd. simpl. rewrite Heq. reflexivity.
+  - apply E_WhileLoop with (t_update s X 1).
+    + simpl. rewrite Heq. reflexivity.
+    + apply E_Havoc.
+    + apply E_WhileEnd. simpl. reflexivity.
+Qed.
+
+Lemma if_p5_terminate: forall s0 s1, p5 / s0 \\ s1 -> t_update s0 X 1 = s1.
+Proof.
+  intros. remember p5.  induction H; try inversion Heqc.
+  - apply functional_extensionality. intros x. destruct (beq_id x X) eqn:Heq1.
+    +  assert ( st X = 1 ). { rewrite H1 in H. simpl in H. apply negb_false_iff in H. apply beq_nat_true in H. assumption. }
+       apply beq_id_true_iff in Heq1. subst. rewrite H0. apply t_update_eq.
+    +  apply beq_id_false_iff in Heq1. apply t_update_neq. intros H'. apply Heq1. symmetry. assumption.
+  - assert ((t_update st X 1) = (t_update st' X 1)). {
+      apply functional_extensionality. intros x. destruct (beq_id x X) eqn:Heq1.
+      + apply beq_id_true_iff in Heq1. assert (t_update st X 1 x = 1). { rewrite Heq1. apply t_update_eq. }
+        assert (t_update st' X 1 x = 1). { rewrite Heq1. apply t_update_eq. }
+        rewrite H2, H5. reflexivity.
+      + apply beq_id_false_iff in Heq1. assert (X <> x). { intros H'. apply Heq1. symmetry. assumption. }
+        assert ((t_update st X 1 x) = st x). { apply t_update_neq. assumption. }
+        rewrite H5.
+        assert ((t_update st' X 1 x) = st' x). { apply t_update_neq. assumption. }
+        rewrite H6.
+        destruct H0; inversion H4. symmetry. apply t_update_neq. assumption. }
+    rewrite H2. apply IHceval2. assumption.
+Qed.
+
+Theorem p5_p6_equiv : cequiv p5 p6.
+Proof.
+  intros. unfold cequiv. intros st st'. split.
+  - intros H. apply if_p5_terminate in H. rewrite <- H. apply E_Ass. reflexivity.
+  - intros H. remember p6.  destruct H; inversion Heqc. subst. simpl. apply p5_may_terminate.
+Qed.
+
+End Himp.
+
+Lemma neq_refl: forall (X:Type) (x y:X),
+  x <> y -> y <> x.
+Proof.
+  intros. intros H1. apply H. symmetry. assumption.
+Qed.
+
+
+Theorem swap_noninterfering_assignments: forall l1 l2 a1 a2,
+  l1 <> l2 ->
+  var_not_used_in_aexp l1 a2 ->
+  var_not_used_in_aexp l2 a1 ->
+  cequiv
+    (l1 ::= a1;; l2 ::= a2)
+    (l2 ::= a2;; l1 ::= a1).
+Proof. unfold cequiv. intros. split.
+  - intros H3. inversion H3; subst. remember (l1 ::= a1). destruct H5; inversion Heqc. subst.
+    remember (l2 ::= a2). remember (t_update st l1 (aeval st a1)) as st0. 
+    destruct H8; inversion Heqc0. subst. 
+    assert ((aeval (t_update st l1 (aeval st a1)) a2) = aeval st a2). { apply aeval_weakening. assumption. }
+    rewrite H2 in H3. rewrite H2.
+    assert ((aeval (t_update st l2 (aeval st a2)) a1) = aeval st a1). { apply aeval_weakening. assumption. }
+    assert ((l2 ::= a2;; l1 ::= a1) / st \\ t_update (t_update st l2 (aeval st a2)) l1 (aeval st a1)). {
+      rewrite <- H4. apply E_Seq with (t_update st l2 (aeval st a2)); apply E_Ass; reflexivity.
+    }
+    assert (l2 <> l1). { intros H'. apply H. symmetry. assumption. }
+    assert ((t_update (t_update st l2 (aeval st a2)) l1 (aeval st a1)) = (t_update (t_update st l1 (aeval st a1)) l2 (aeval st a2))). {
+      apply functional_extensionality. intros x.
+      destruct (beq_id x l1) eqn:Heqn.
+      + apply beq_id_true_iff in Heqn. rewrite Heqn. 
+        assert ((t_update (t_update st l2 (aeval st a2)) l1 (aeval st a1) l1) = (aeval st a1)). { apply t_update_eq. }
+        rewrite H7.
+        assert ((t_update (t_update st l1 (aeval st a1)) l2 (aeval st a2) l1) = (t_update st l1 (aeval st a1) l1)). { apply t_update_neq.  assumption. }
+        rewrite H8. symmetry. apply t_update_eq.
+      + destruct (beq_id x l2) eqn:Heqn1.
+        * apply beq_id_true_iff in Heqn1. rewrite Heqn1. 
+          assert ((t_update (t_update st l1 (aeval st a1)) l2 (aeval st a2) l2) = (aeval st a2)). { apply t_update_eq. }
+          rewrite H7.
+          assert ((t_update (t_update st l2 (aeval st a2)) l1 (aeval st a1) l2) = (t_update st l2 (aeval st a2) l2)). { apply t_update_neq.  assumption. }
+          rewrite H8. apply t_update_eq.
+        * apply beq_id_false_iff in Heqn. apply beq_id_false_iff in Heqn1.
+          assert ((t_update (t_update st l2 (aeval st a2)) l1 (aeval st a1) x) = (t_update st l2 (aeval st a2) x)). { apply t_update_neq. apply neq_refl. assumption. }
+          assert ((t_update st l2 (aeval st a2) x) = (st x)). { apply t_update_neq. apply neq_refl. assumption. }
+          rewrite H7, H8.
+          assert ((t_update (t_update st l1 (aeval st a1)) l2 (aeval st a2) x) = (t_update st l1 (aeval st a1) x)). { apply t_update_neq. apply neq_refl. assumption. }
+          assert ((t_update st l1 (aeval st a1) x) = (st x)). { apply t_update_neq. apply neq_refl. assumption. }
+          rewrite H9, H10. reflexivity.
+  
+    }
+    rewrite <- H7. assumption.
+Admitted. (* Similarly *)
+
+Definition capprox (c1 c2 : com) : Prop := forall (st st' : state),
+  c1 / st \\ st' -> c2 / st \\ st'.
+
+Definition c3 : com :=
+  X ::= ANum 1.
+Definition c4 : com :=
+  X ::= ANum 2.
+
+Theorem c3_c4_different : ~ capprox c3 c4 /\ ~ capprox c4 c3.
+Proof. split.
+  - unfold capprox. intros contra.
+    assert (c3 / empty_state \\ t_update empty_state X 1). { apply E_Ass. reflexivity. }
+    assert (c4 / empty_state \\ t_update empty_state X 2). { apply E_Ass. reflexivity. }
+    apply contra in H. 
+    assert (Hcontra: (t_update empty_state X 1) = (t_update empty_state X 2)). { apply ceval_deterministic with c4 empty_state; assumption. }
+    assert ((t_update empty_state X 1 X) = (t_update empty_state X 2 X)). { rewrite  Hcontra. reflexivity. }
+    inversion H1.
+  - unfold capprox. intros contra.
+    assert (c3 / empty_state \\ t_update empty_state X 1). { apply E_Ass. reflexivity. }
+    assert (c4 / empty_state \\ t_update empty_state X 2). { apply E_Ass. reflexivity. }
+    apply contra in H0. 
+    assert (Hcontra: (t_update empty_state X 1) = (t_update empty_state X 2)). { apply ceval_deterministic with c3 empty_state; assumption. }
+    assert ((t_update empty_state X 1 X) = (t_update empty_state X 2 X)). { rewrite  Hcontra. reflexivity. }
+    inversion H1.
+Qed.
+
+Definition cmin : com :=
+  WHILE BTrue DO SKIP END.
+
+Theorem cmin_minimal : forall c, capprox cmin c.
+Proof. 
+  unfold capprox. intros. exfalso. assert (~( (WHILE BTrue DO SKIP END) / st \\ st' )). {
+    apply WHILE_true_nonterm. unfold bequiv. intros. reflexivity.
+  }
+  apply H0. apply H.
+Qed.
+
+Definition zprop (c : com) : Prop :=
+  c / empty_state \\ t_update empty_state X 1.
+
+Theorem zprop_preserving : forall c c',
+  zprop c -> capprox c c' -> zprop c'.
+Proof. 
+  unfold zprop. unfold capprox. intros.
+  apply H0. assumption.
+Qed.
