@@ -110,3 +110,90 @@ Example assn_sub_ex2:
   {{ fun st => (0 <= (st X)) /\ (st X <= 5) }}.
 Proof.
   apply hoare_asgn. Qed.
+
+(* hoare_asgn_wrong  {{ True }} X::= a {{ X = a}} doesn't work for a = APlus (AId X) (ANum 10) *)
+
+Lemma neq_refl: forall (X:Type) (x y:X),
+  x <> y -> y <> x.
+Proof.
+  intros. intros H1. apply H. symmetry. assumption.
+Qed.
+
+Theorem hoare_asgn_fwd:
+  (forall {X Y: Type} {f g : X -> Y},
+    (forall (x :X), f x = g x) -> f = g) ->
+  forall m a P,
+  {{ fun st => P st /\ st X = m }}
+    X ::= a
+  {{ fun st => P (t_update st X m) /\ st X = aeval (t_update st X m) a }}.
+Proof.
+  intros. unfold hoare_triple. intros. inversion H1. inversion H0. subst.
+  assert ( (t_update (t_update st X (aeval st a)) X (st X)) = st ). {
+      apply H. intros. destruct (beq_id x X) eqn:Heqn.
+      + apply beq_id_true_iff in Heqn. rewrite Heqn. apply t_update_eq.
+      + apply beq_id_false_iff in Heqn.  
+        assert ((t_update (t_update st X (aeval st a)) X (st X) x) = t_update st X (aeval st a) x). {
+          apply t_update_neq. apply neq_refl. assumption.
+        }
+        rewrite H3. apply t_update_neq. apply neq_refl. assumption.
+    }
+   split.
+  - rewrite H3. assumption.
+  - rewrite H3. apply t_update_eq.
+Qed.
+
+Theorem hoare_asgn_fwd_exists :
+  (forall {X Y: Type} {f g : X -> Y},
+     (forall (x: X), f x = g x) -> f = g) ->
+  forall a P,
+  {{fun st => P st}}
+    X ::= a
+  {{fun st => exists m, P (t_update st X m) /\
+                st X = aeval (t_update st X m) a }}.
+Proof.
+  intros functional_extensionality a P. unfold hoare_triple.
+  intros. inversion H. subst. exists (st X).
+  assert ( (t_update (t_update st X (aeval st a)) X (st X)) = st ). {
+      apply functional_extensionality. intros. destruct (beq_id x X) eqn:Heqn.
+      + apply beq_id_true_iff in Heqn. rewrite Heqn. apply t_update_eq.
+      + apply beq_id_false_iff in Heqn.  
+        assert ((t_update (t_update st X (aeval st a)) X (st X) x) = t_update st X (aeval st a) x). {
+          apply t_update_neq. apply neq_refl. assumption.
+        }
+        rewrite H1. apply t_update_neq. apply neq_refl. assumption.
+    }
+  split.
+  - rewrite H1. assumption.
+  - rewrite H1. apply t_update_eq.
+Qed. 
+
+
+Theorem hoare_consequence_pre : forall (P P' Q : Assertion) c,
+  {{P'}} c {{Q}} ->
+    P ->> P' ->
+  {{P}} c {{Q}}.
+Proof.
+  intros P P' Q c Hhoare Himp.
+  intros st st' Hc HP.
+  apply (Hhoare st st').
+  assumption. apply Himp. assumption. Qed.
+
+Theorem hoare_consequence_post : forall (P Q Q' : Assertion) c,
+  {{P}} c {{Q'}} ->
+    Q' ->> Q ->
+  {{P}} c {{Q}}.
+Proof.
+  intros P Q Q' c Hhoare Himp.
+  intros st st' Hc HP.
+  apply Himp.
+  apply (Hhoare st st').
+  assumption. assumption. Qed.
+
+Example hoare_asgn_example1 :
+  {{fun st => True}} (X ::= (ANum 1)) {{fun st => st X = 1}}.
+Proof.
+  apply hoare_consequence_pre
+    with (P' := (fun st => st X = 1) [X |-> ANum 1]).
+  apply hoare_asgn.
+  intros st H. unfold assn_sub, t_update. simpl. reflexivity.
+Qed.
