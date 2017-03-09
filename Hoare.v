@@ -191,9 +191,139 @@ Proof.
 
 Example hoare_asgn_example1 :
   {{fun st => True}} (X ::= (ANum 1)) {{fun st => st X = 1}}.
-Proof.
-  apply hoare_consequence_pre
+Proof. 
+  apply hoare_consequence_pre 
     with (P' := (fun st => st X = 1) [X |-> ANum 1]).
   apply hoare_asgn.
   intros st H. unfold assn_sub, t_update. simpl. reflexivity.
+Qed.
+
+Theorem hoare_consequence : forall (P P' Q Q' : Assertion) c,
+  {{P'}} c {{Q'}} ->
+  P ->> P' ->
+  Q' ->> Q ->
+  {{P}} c {{Q}}.
+Proof.
+  intros. apply hoare_consequence_post with Q'.
+  + apply hoare_consequence_pre with P'; assumption.
+  + assumption.
+Qed.
+
+Example hoare_asgn_example1' :
+  {{fun st => True}}
+  (X ::= (ANum 1))
+  {{fun st => st X = 1}}.
+Proof.
+  eapply hoare_consequence_pre. 
+  apply hoare_asgn.
+  intros st H.  reflexivity. Qed.
+
+Lemma silly1 : forall (P : nat -> nat -> Prop) (Q : nat -> Prop),
+  (forall x y : nat, P x y) ->
+  (forall x y : nat, P x y -> Q x) ->
+  Q 42.
+Proof.
+  intros P Q HP HQ. eapply HQ. apply HP.
+Abort.
+
+Lemma silly2 :
+  forall (P : nat -> nat -> Prop) (Q : nat -> Prop),
+  (exists y, P 42 y) ->
+  (forall x y : nat, P x y -> Q x) ->
+  Q 42.
+Proof.
+  intros P Q HP HQ. eapply HQ. destruct HP as [y HP'].
+Abort.
+
+Lemma silly2_fixed :
+  forall (P : nat -> nat -> Prop) (Q : nat -> Prop),
+  (exists y, P 42 y) ->
+  (forall x y : nat, P x y -> Q x) ->
+  Q 42.
+Proof.
+   intros P Q HP HQ. destruct HP as [y HP']. eapply HQ. apply HP'.
+Qed.
+
+Lemma silly2_eassumption :
+  forall (P : nat -> nat -> Prop) (Q : nat -> Prop),
+  (exists y, P 42 y) ->
+  (forall x y : nat, P x y -> Q x) ->
+  Q 42.
+Proof.
+   intros P Q HP HQ. destruct HP as [y HP']. eapply HQ. eassumption.
+Qed.
+
+Example assn_sub_ex1' :
+  {{ fun st => st X + 1 <= 5 }}
+  ( X ::= APlus (AId X) (ANum 1) )
+  {{ fun st => st X <= 5 }}.
+Proof.
+  intros. eapply hoare_consequence_pre. apply hoare_asgn.
+  intros st H. unfold assn_sub. simpl. rewrite t_update_eq. assumption.
+Qed.
+
+Example assn_sub_ex2' :
+  {{ fun st => 0 <= 3 /\ 3 <= 5 }}
+  ( X ::= ANum 3 )
+  {{ fun st => 0 <= st X  /\ st X <= 5 }}.
+Proof.
+  intros. eapply hoare_consequence_pre. apply hoare_asgn.
+  intros st H. unfold assn_sub. simpl. rewrite t_update_eq. assumption.
+Qed.
+
+
+Theorem hoare_skip : forall P,
+  {{P}} SKIP {{P}}.
+Proof.
+  intros P st st' H HP. inversion H. subst. assumption.
+Qed.
+
+Theorem hoare_seq : forall P Q R c1 c2,
+     {{Q}} c2 {{R}} ->
+     {{P}} c1 {{Q}} ->
+     {{P}} c1;;c2 {{R}}.
+Proof.
+  intros P Q R c1 c2 H1 H2 st st' H12 Pre.
+  inversion H12; subst.
+  apply (H1 st'0 st'); try assumption.
+  apply (H2 st st'0); assumption. Qed.
+
+Example hoare_asgn_example3 : forall a n,
+  {{fun st => aeval st a = n}}
+  (X ::= a;; SKIP)
+  {{fun st => st X = n}}.
+Proof.
+  intros a n. eapply hoare_seq.
+  - (* right part of seq *)
+    apply hoare_skip.
+  - (* left part of seq *)
+    eapply hoare_consequence_pre. apply hoare_asgn.
+    intros st H. subst. reflexivity.
+Qed.
+
+Example hoare_asgn_example4 :
+  {{fun st => True}} (X ::= (ANum 1);; Y ::= (ANum 2))
+  {{fun st => st X = 1 /\ st Y = 2}}.
+Proof.
+   eapply hoare_seq. apply hoare_asgn. 
+   eapply hoare_consequence_pre. apply hoare_asgn.
+   intros st H. unfold assn_sub. simpl. split; unfold t_update; reflexivity.
+Qed.
+
+Definition swap_program : com :=
+  Z::= (AId X) ;; X ::= (AId Y) ;; Y ::= (AId Z).
+
+Theorem swap_excerice :
+ {{fun st => st X <= st Y }}
+  swap_program 
+ {{fun st => st Y <= st X }}.
+Proof.
+  apply hoare_seq with (fun st => st X <= st Y /\ st Z <= st Y ).
+  + eapply hoare_seq. apply  hoare_asgn.
+   eapply hoare_consequence_pre. apply hoare_asgn. intros st H. unfold assn_sub. simpl.
+   rewrite t_update_eq. rewrite t_update_neq. rewrite t_update_neq. rewrite t_update_eq.
+  inversion H. assumption. intros H'. inversion H'. intros H'. inversion H'.
+  + eapply hoare_consequence_pre. apply hoare_asgn. intros st H. unfold assn_sub.  simpl. split.
+    - repeat rewrite t_update_neq. assumption. intros H'. inversion H'. intros H'. inversion H'.
+    - rewrite t_update_eq. rewrite t_update_neq. assumption. intros H'. inversion H'.
 Qed.
