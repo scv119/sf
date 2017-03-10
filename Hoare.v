@@ -327,3 +327,181 @@ Proof.
     - repeat rewrite t_update_neq. assumption. intros H'. inversion H'. intros H'. inversion H'.
     - rewrite t_update_eq. rewrite t_update_neq. assumption. intros H'. inversion H'.
 Qed.
+
+Definition bassn b : Assertion :=
+  fun st => (beval st b = true).
+
+Lemma bexp_eval_true : forall b st,
+  beval st b = true -> (bassn b) st.
+Proof.
+  intros. unfold bassn. assumption.
+Qed.
+
+Lemma bexp_eval_false : forall b st,
+  beval st b = false -> ~ ((bassn b) st).
+Proof.
+  intros. unfold bassn. intros H'. rewrite H in H'. inversion H'.
+Qed.
+
+Theorem hoare_if : forall P Q b c1 c2,
+  {{ fun st => P st /\ bassn b st }} c1 {{ Q }} ->
+  {{ fun st => P st /\ ~ (bassn b st) }} c2 {{ Q }} ->
+  {{ P }} (IFB b THEN c1 ELSE c2 FI) {{ Q }}.
+Proof.
+  intros P Q b c1 c2 HTrue HFalse st st' HE HP.
+  inversion HE; subst.
+  - (* b is true *)
+    apply (HTrue st st').
+      assumption.
+      split. assumption.
+             apply bexp_eval_true. assumption.
+  - (* b is false *)
+    apply (HFalse st st').
+      assumption.
+      split. assumption.
+             apply bexp_eval_false. assumption. Qed.
+
+Example if_example :
+    {{fun st => True}}
+  IFB (BEq (AId X) (ANum 0))
+    THEN (Y ::= (ANum 2))
+    ELSE (Y ::= APlus (AId X) (ANum 1))
+  FI
+    {{fun st =>st X <= st Y}}.
+Proof.
+  apply hoare_if.
+  - eapply hoare_consequence_pre. apply hoare_asgn. unfold bassn, assn_sub, t_update, assert_implies.
+    simpl. intros. inversion H. apply beq_nat_true in H1. rewrite H1. omega.
+  -  eapply hoare_consequence_pre. apply hoare_asgn. unfold bassn, assn_sub, t_update, assert_implies.
+    simpl. intros. omega.
+Qed.
+
+Theorem if_minus_plus :
+  {{fun st => True}}
+  IFB (BLe (AId X) (AId Y))
+    THEN (Z ::= AMinus (AId Y) (AId X))
+    ELSE (Y ::= APlus (AId X) (AId Z))
+  FI
+  {{fun st => st Y = st X + st Z}}.
+Proof.
+  apply hoare_if. 
+  - eapply hoare_consequence_pre. apply hoare_asgn. unfold bassn, assn_sub, t_update, assert_implies.
+    simpl. intros. inversion H. SearchAbout le. apply  leb_complete in H1. symmetry. apply le_plus_minus_r. assumption.
+  - eapply hoare_consequence_pre. apply hoare_asgn. unfold bassn, assn_sub, t_update, assert_implies.
+    simpl. intros. reflexivity.
+Qed.
+
+
+Module If1.
+
+Inductive com : Type :=
+  | CSkip : com
+  | CAss : id -> aexp -> com
+  | CSeq : com -> com -> com
+  | CIf : bexp -> com -> com -> com
+  | CWhile : bexp -> com -> com
+  | CIf1 : bexp -> com -> com.
+
+Notation "'SKIP'" :=
+  CSkip.
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "X '::=' a" :=
+  (CAss X a) (at level 60).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'IFB' e1 'THEN' e2 'ELSE' e3 'FI'" :=
+  (CIf e1 e2 e3) (at level 80, right associativity).
+Notation "'IF1' b 'THEN' c 'FI'" :=
+  (CIf1 b c) (at level 80, right associativity).
+
+Reserved Notation "c1 '/' st '\\' st'" (at level 40, st at level 39).
+
+Inductive ceval : com -> state -> state -> Prop :=
+  | E_Skip :  forall st : state, SKIP / st \\ st
+  | E_Ass :  forall (st : state) (a1 : aexp) (n : nat) (X : id),
+            aeval st a1 = n -> (X ::= a1) / st \\ t_update st X n
+  | E_Seq :  forall (c1 c2 : com) (st st' st'' : state),
+            c1 / st \\ st' -> c2 / st' \\ st'' -> (c1 ;; c2) / st \\ st''
+  | E_IfTrue :  forall (st st' : state) (b1 : bexp) (c1 c2 : com),
+               beval st b1 = true ->
+               c1 / st \\ st' -> (IFB b1 THEN c1 ELSE c2 FI) / st \\ st'
+  | E_IfFalse :  forall (st st' : state) (b1 : bexp) (c1 c2 : com),
+                beval st b1 = false ->
+                c2 / st \\ st' -> (IFB b1 THEN c1 ELSE c2 FI) / st \\ st'
+  | E_WhileEnd :  forall (b1 : bexp) (st : state) (c1 : com),
+                 beval st b1 = false -> (WHILE b1 DO c1 END) / st \\ st
+  | E_WhileLoop :  forall (st st' st'' : state) (b1 : bexp) (c1 : com),
+                  beval st b1 = true ->
+                  c1 / st \\ st' ->
+                  (WHILE b1 DO c1 END) / st' \\ st'' ->
+                  (WHILE b1 DO c1 END) / st \\ st''
+  | E_If1True: forall (st st' : state) (b1 : bexp) (c1 : com),
+               beval st b1 = true ->
+               c1 / st \\ st' -> (IF1 b1 THEN c1 FI) / st \\ st'
+  | E_If1False: forall (st : state) (b1 : bexp) (c1 : com),
+               beval st b1 = false ->  (IF1 b1 THEN c1 FI) / st \\ st
+
+  where "c1 '/' st '\\' st'" := (ceval c1 st st').
+
+Definition hoare_triple (P:Assertion) (c:com) (Q:Assertion) : Prop :=
+   forall st st',
+       c / st \\ st' ->
+       P st ->
+       Q st'.
+
+Notation "{{ P }} c {{ Q }}" := (hoare_triple P c Q)
+                                  (at level 90, c at next level)
+                                  : hoare_spec_scope.
+
+Theorem hoare_if1 : forall P Q b c,
+  {{ fun st => P st /\ bassn b st }} c {{ Q }} ->
+  {{ fun st => P st /\ ~ (bassn b st) }} SKIP {{ Q }} ->
+  {{ P }} (IF1 b THEN c FI) {{ Q }}.
+Proof.
+   intros P Q b c HTrue HFalse st st' HE HP.
+  inversion HE; subst.
+  - apply (HTrue st st'). assumption. split; assumption.
+  - apply (HFalse st' st'). apply E_Skip. split. assumption. intros H. unfold bassn in H. rewrite H3 in H.
+    inversion H.
+Qed.
+
+Theorem hoare_consequence_pre : forall (P P' Q : Assertion) c,
+  {{P'}} c {{Q}} ->
+    P ->> P' ->
+  {{P}} c {{Q}}.
+Proof.
+  intros P P' Q c Hhoare Himp.
+  intros st st' Hc HP.
+  apply (Hhoare st st').
+  assumption. apply Himp. assumption. Qed.
+
+Theorem hoare_asgn : forall Q X a,
+  {{Q [X |-> a]}} (X ::= a) {{Q}}.
+Proof.
+  intros. unfold hoare_triple. intros.
+  inversion H. subst. unfold assn_sub in H0. assumption.
+Qed.
+
+Theorem hoare_skip : forall P,
+  {{P}} SKIP {{P}}.
+Proof.
+  intros P st st' H HP. inversion H. subst. assumption.
+Qed.
+
+Lemma hoare_if1_good :
+  {{ fun st => st X + st Y = st Z }}
+  IF1 BNot (BEq (AId Y) (ANum 0)) THEN
+    X ::= APlus (AId X) (AId Y)
+  FI
+  {{ fun st => st X = st Z }}.
+Proof. 
+  apply hoare_if1.
+  - eapply hoare_consequence_pre. apply hoare_asgn. unfold bassn, assn_sub, t_update, assert_implies.
+    simpl. intros. inversion H. assumption.
+  - eapply hoare_consequence_pre. apply hoare_skip. unfold bassn, assn_sub, t_update, assert_implies.
+    simpl. intros. inversion H. apply eq_true_negb_classical in H1. apply beq_nat_true in H1. rewrite H1 in H0.
+    simpl in H0. rewrite <- plus_n_O in H0. assumption.
+Qed.
+
+End If1.
