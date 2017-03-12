@@ -509,3 +509,11 @@ End If1.
 Lemma hoare_while : forall P b c,
   {{fun st => P st /\ bassn b st}} c {{P}} ->
   {{P}} WHILE b DO c END {{fun st => P st /\ ~ (bassn b st)}}.
+Proof.
+  intros P b c Hoare st st' He Hp.
+  remember (WHILE b DO c END) as wcom eqn:Heqwcom.
+  induction He;
+    try (inversion Heqwcom); subst; clear Heqwcom.
+  - split. assumption. apply bexp_eval_false. assumption.
+  - apply IHHe2. reflexivity. apply (Hoare st st'). assumption. split. assumption. apply bexp_eval_true. assumption.
+Qed.
