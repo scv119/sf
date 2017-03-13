@@ -504,7 +504,7 @@ Proof.
     simpl in H0. rewrite <- plus_n_O in H0. assumption.
 Qed.
 
-End If1.
+End If1. 
 
 Lemma hoare_while : forall P b c,
   {{fun st => P st /\ bassn b st}} c {{P}} ->
@@ -516,4 +516,11 @@ Proof.
     try (inversion Heqwcom); subst; clear Heqwcom.
   - split. assumption. apply bexp_eval_false. assumption.
   - apply IHHe2. reflexivity. apply (Hoare st st'). assumption. split. assumption. apply bexp_eval_true. assumption.
-Qed.
+
+
+Example while_example :
+    {{fun st => st X <= 3}}
+  WHILE (BLe (AId X) (ANum 2))
+  DO X ::= APlus (AId X) (ANum 1) END
+    {{fun st => st X = 3}}.
+Proof.
