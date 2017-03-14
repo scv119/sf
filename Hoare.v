@@ -504,9 +504,9 @@ Proof.
     simpl in H0. rewrite <- plus_n_O in H0. assumption.
 Qed.
 
-End If1. 
+End If1.
 
-Lemma hoare_while : forall P b c,
+Lemma hoare_while: forall P b c,
   {{fun st => P st /\ bassn b st}} c {{P}} ->
   {{P}} WHILE b DO c END {{fun st => P st /\ ~ (bassn b st)}}.
 Proof.
@@ -516,6 +516,7 @@ Proof.
     try (inversion Heqwcom); subst; clear Heqwcom.
   - split. assumption. apply bexp_eval_false. assumption.
   - apply IHHe2. reflexivity. apply (Hoare st st'). assumption. split. assumption. apply bexp_eval_true. assumption.
+Qed.
 
 
 Example while_example :
@@ -524,3 +525,131 @@ Example while_example :
   DO X ::= APlus (AId X) (ANum 1) END
     {{fun st => st X = 3}}.
 Proof.
+  eapply hoare_consequence_post. 
+  apply hoare_while.
+  eapply  hoare_consequence_pre.
+  apply hoare_asgn.
+  unfold bassn, assn_sub, assert_implies, t_update. simpl.
+  intros st [H1 H2]. apply leb_complete in H2. omega.
+   unfold bassn, assn_sub, assert_implies, t_update. intros st [Hle Hb].
+    simpl in Hb. destruct (leb (st X) 2) eqn: Heqle.
+    exfalso. apply Hb. reflexivity.
+    apply leb_iff_conv in Heqle. omega.
+Qed.
+
+Theorem always_loop_hoare : forall P Q,
+  {{P}} WHILE BTrue DO SKIP END {{ Q }}.
+Proof.
+  intros P Q.
+  apply hoare_consequence_pre with (P' := fun st : state => True).
+  eapply hoare_consequence_post.
+  apply hoare_while.
+  - apply hoare_post_true. intros st. apply I.
+  - simpl. intros st [H1 H2]. exfalso. apply H2. unfold bassn. reflexivity.
+  - unfold assert_implies. intros. apply I.
+Qed.
+
+Module RepeatExercise.
+
+Inductive com : Type :=
+  | CSkip : com
+  | CAsgn : id -> aexp -> com
+  | CSeq : com -> com -> com
+  | CIf : bexp -> com -> com -> com
+  | CWhile : bexp -> com -> com
+  | CRepeat : com -> bexp -> com.
+
+Notation "'SKIP'" :=
+  CSkip.
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "X '::=' a" :=
+  (CAsgn X a) (at level 60).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'IFB' e1 'THEN' e2 'ELSE' e3 'FI'" :=
+  (CIf e1 e2 e3) (at level 80, right associativity).
+Notation "'REPEAT' e1 'UNTIL' b2 'END'" :=
+  (CRepeat e1 b2) (at level 80, right associativity).
+
+Inductive ceval : state -> com -> state -> Prop :=
+  | E_Skip : forall st,
+      ceval st SKIP st
+  | E_Ass : forall st a1 n X,
+      aeval st a1 = n ->
+      ceval st (X ::= a1) (t_update st X n)
+  | E_Seq : forall c1 c2 st st' st'',
+      ceval st c1 st' ->
+      ceval st' c2 st'' ->
+      ceval st (c1 ;; c2) st''
+  | E_IfTrue : forall st st' b1 c1 c2,
+      beval st b1 = true ->
+      ceval st c1 st' ->
+      ceval st (IFB b1 THEN c1 ELSE c2 FI) st'
+  | E_IfFalse : forall st st' b1 c1 c2,
+      beval st b1 = false ->
+      ceval st c2 st' ->
+      ceval st (IFB b1 THEN c1 ELSE c2 FI) st'
+  | E_WhileEnd : forall b1 st c1,
+      beval st b1 = false ->
+      ceval st (WHILE b1 DO c1 END) st
+  | E_WhileLoop : forall st st' st'' b1 c1,
+      beval st b1 = true ->
+      ceval st c1 st' ->
+      ceval st' (WHILE b1 DO c1 END) st'' ->
+      ceval st (WHILE b1 DO c1 END) st''
+  | E_RepeatEnd : forall st st' b1 c1,
+      ceval st c1 st' ->
+      beval st' b1 = true ->
+      ceval st (REPEAT c1 UNTIL b1 END) st'
+  | E_RepeatLoop : forall st st' st'' b1 c1,
+      ceval st c1 st' ->
+      beval st' b1 = false ->
+      ceval st' (REPEAT c1 UNTIL b1 END) st'' ->
+      ceval st (REPEAT c1 UNTIL b1 END) st''
+.
+
+Notation "c1 '/' st '\\' st'" := (ceval st c1 st')
+                                 (at level 40, st at level 39).
+
+Definition hoare_triple (P:Assertion) (c:com) (Q:Assertion)
+                        : Prop :=
+  forall st st', (c / st \\ st') -> P st -> Q st'.
+
+Notation "{{ P }} c {{ Q }}" :=
+  (hoare_triple P c Q) (at level 90, c at next level).
+
+Definition ex1_repeat :=
+  REPEAT
+    X ::= ANum 1;;
+    Y ::= APlus (AId Y) (ANum 1)
+  UNTIL (BEq (AId X) (ANum 1)) END.
+
+Theorem ex1_repeat_works :
+  ex1_repeat / empty_state \\
+               t_update (t_update empty_state X 1) Y 1.
+Proof.
+  apply E_RepeatEnd.
+  - apply E_Seq with (t_update empty_state X 1).
+    + apply E_Ass. reflexivity.
+    + apply E_Ass. reflexivity.
+  - reflexivity.
+Qed.
+
+Lemma hoare_repeat : forall P Q b c,
+  {{fun st => Q st /\ ~ bassn b st}} c {{Q}} ->
+  {{P}} c {{Q}} ->
+  {{P}} REPEAT c UNTIL b END {{fun st => Q st /\ bassn b st}}.
+Proof.
+  unfold hoare_triple; intros. generalize dependent P.
+  remember (REPEAT c UNTIL b END) as loopdef eqn:loop.
+  induction H1; inversion loop; subst.
+  - intros. subst. split. eapply H2. apply H1. assumption. unfold bassn. assumption.
+  - intros. subst. eapply IHceval2.
+    + subst. reflexivity.
+    + eapply H.
+    + simpl. split.
+     * eapply H1. eassumption. assumption.
+     * intros H3. unfold bassn in H3. rewrite H0 in H3. inversion H3.
+Qed.
+
