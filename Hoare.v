@@ -653,3 +653,71 @@ Proof.
      * intros H3. unfold bassn in H3. rewrite H0 in H3. inversion H3.
 Qed.
 
+End RepeatExercise.
+
+Module Himp.
+
+Inductive com : Type :=
+  | CSkip : com
+  | CAsgn : id -> aexp -> com
+  | CSeq : com -> com -> com
+  | CIf : bexp -> com -> com -> com
+  | CWhile : bexp -> com -> com
+  | CHavoc : id -> com.
+
+Notation "'SKIP'" :=
+  CSkip.
+Notation "X '::=' a" :=
+  (CAsgn X a) (at level 60).
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'IFB' e1 'THEN' e2 'ELSE' e3 'FI'" :=
+  (CIf e1 e2 e3) (at level 80, right associativity).
+Notation "'HAVOC' X" := (CHavoc X) (at level 60).
+
+Reserved Notation "c1 '/' st '\\' st'" (at level 40, st at level 39).
+
+Inductive ceval : com -> state -> state -> Prop :=
+  | E_Skip : forall st : state, SKIP / st \\ st
+  | E_Ass : forall (st : state) (a1 : aexp) (n : nat) (X : id),
+            aeval st a1 = n -> (X ::= a1) / st \\ t_update st X n
+  | E_Seq : forall (c1 c2 : com) (st st' st'' : state),
+            c1 / st \\ st' -> c2 / st' \\ st'' -> (c1 ;; c2) / st \\ st''
+  | E_IfTrue : forall (st st' : state) (b1 : bexp) (c1 c2 : com),
+               beval st b1 = true ->
+               c1 / st \\ st' -> (IFB b1 THEN c1 ELSE c2 FI) / st \\ st'
+  | E_IfFalse : forall (st st' : state) (b1 : bexp) (c1 c2 : com),
+                beval st b1 = false ->
+                c2 / st \\ st' -> (IFB b1 THEN c1 ELSE c2 FI) / st \\ st'
+  | E_WhileEnd : forall (b1 : bexp) (st : state) (c1 : com),
+                 beval st b1 = false -> (WHILE b1 DO c1 END) / st \\ st
+  | E_WhileLoop : forall (st st' st'' : state) (b1 : bexp) (c1 : com),
+                  beval st b1 = true ->
+                  c1 / st \\ st' ->
+                  (WHILE b1 DO c1 END) / st' \\ st'' ->
+                  (WHILE b1 DO c1 END) / st \\ st''
+  | E_Havoc : forall (st : state) (X : id) (n : nat),
+              (HAVOC X) / st \\ t_update st X n
+
+  where "c1 '/' st '\\' st'" := (ceval c1 st st').
+
+Definition hoare_triple (P:Assertion) (c:com) (Q:Assertion) : Prop :=
+  forall st st', c / st \\ st' -> P st -> Q st'.
+
+Notation "{{ P }} c {{ Q }}" := (hoare_triple P c Q)
+                                  (at level 90, c at next level)
+                                  : hoare_spec_scope.
+
+Definition havoc_pre (X : id) (Q : Assertion) : Assertion :=
+  fun st => (forall x, Q (t_update st X x)).
+
+Theorem hoare_havoc : forall (Q : Assertion) (X : id),
+  {{ havoc_pre X Q }} HAVOC X {{ Q }}.
+Proof.
+  intros. intros st st'. intros H. remember (HAVOC X) as havoc.
+  destruct H; try inversion Heqhavoc. intros. unfold havoc_pre in H. apply H.
+Qed.
+
+End Himp.
