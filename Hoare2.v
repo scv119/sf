@@ -209,3 +209,11 @@ Proof.
     simpl. remember (st X) as x.
     destruct x. inversion H. destruct x. inversion H. inversion H3. reflexivity.
 Qed.
+
+(*       {{ X=m }}
+    Z ::= 0;;
+    WHILE (Z+1)*(Z+1) ≤ X DO
+      Z ::= Z+1
+    END
+      {{ Z*Z≤m ∧ m<(Z+1)*(Z+1) }}
+*)
