@@ -228,3 +228,34 @@ Qed.
   END
     {{ Z = m*m }}
 *)
+
+(* 
+Exercise: 3 stars (factorial)
+Recall that n! denotes the factorial of n (i.e., n! = 1*2*...*n). Here is an Imp program
+ that calculates the factorial of the number initially stored in the variable X and puts it 
+in the variable Y:
+    {{ X = m }}
+  Y ::= 1 ;;
+  WHILE X ≠ 0
+  DO
+     Y ::= Y * X ;;
+     X ::= X - 1
+  END
+    {{ Y = m! }}
+
+Fill in the blanks in following decorated program:
+    {{ X = m }} ->>
+    {{   X! = m! }}
+  Y ::= 1;;
+    {{  Y * X! = m! }}
+  WHILE X ≠ 0
+  DO   {{ Y * X! = m! /\ X <> 0 }} ->>
+       {{ Y * X * (X -1)! = m ! }}
+     Y ::= Y * X;;
+       {{ Y * (X - 1)! = m!                                     }}
+     X ::= X - 1
+       {{ Y * X! = m! }}
+  END
+    {{ Y * X! = m! /\ X = 0 }} ->>
+    {{ Y = m! }}
+*)
