@@ -259,3 +259,109 @@ Fill in the blanks in following decorated program:
     {{ Y * X! = m! /\ X = 0 }} ->>
     {{ Y = m! }}
 *)
+
+(*
+Exercise: 3 stars (Min_Hoare)
+  {{ True }} ->>
+  {{ min a b = min a b }}
+  X ::= a;;
+  {{ min X b) = min a b}}
+  Y ::= b;;
+  {{ 0 + (min X Y) = min a b }}
+  Z ::= 0;;
+  {{ Z + (min X Y) = min a b }}
+  WHILE (X ≠ 0 ∧ Y ≠ 0) DO
+  {{  Z + (min X Y) = min a b /\ (X ≠ 0 ∧ Y ≠ 0)}} ->>
+  {{ Z + 1 + (min (X - 1) (Y - 1)) = min a b }}
+  X := X - 1;;
+  {{ Z + 1 + (min X (Y - 1) = min a b }}
+  Y := Y - 1;;
+  {{ Z + 1 + (min X Y) = min a b }}
+  Z := Z + 1
+  {{ Z + (min X Y) = min a b }}
+  END
+  {{ Z + (min X Y) = min a b /\ (X = 0 \/ Y = 0)}} ->>
+  {{ Z = min a b }}
+
+Exercise: 3 stars (two_loops)
+
+    {{ True }} ->>
+    {{ c = c   }}
+  X ::= 0;;
+    {{ c = X + c }}
+  Y ::= 0;;
+    {{ c = X + c + Y }}
+  Z ::= c;;
+    {{ Z = X + c + Y }}
+  WHILE X ≠ a DO
+      {{ Z = X + c + Y /\ X <> a  }} ->>
+      {{ Z + 1 = X + 1 + c + Y }}
+    X ::= X + 1;;
+      {{ Z + 1 = X + c + Y }}
+    Z ::= Z + 1
+      {{ Z = X + c + Y }}
+  END;;
+    {{ Z = X + c + Y /\ X = a }} ->>
+    {{ Z = a + c + Y }}
+  WHILE Y ≠ b DO
+      {{  Z = a + c + Y /\ Y <> b }} ->>
+      {{ Z + 1= a + c + Y + 1 }}
+    Y ::= Y + 1;;
+      {{ Z + 1 = a + c + Y }}
+    Z ::= Z + 1
+      {{ Z = a + c + Y  }}
+  END
+    {{ Z = a + c + Y /\ Y = b }} ->>
+    {{ Z = a + b + c }}
+*)
+
+(*
+Here is a program that computes the series: 1 + 2 + 2^2 + ... + 2^m = 2^(m+1) - 1
+
+  {{ True }} ->> 
+  {{ 1 = 2 ^ 1 - 1 /\ 1 = 2 ^ 0 }} 
+  X ::= 0;;
+  {{ 1 = 2 ^ (X + 1) - 1 /\ 1 = 2 ^ X  }}
+  Y ::= 1;;
+  {{ Y = 2 ^ (X + 1) - 1 /\ 1 = 2 ^ X }}
+  Z ::= 1;;
+  {{ Y = 2 ^ (X + 1) - 1 /\ Z = 2 ^ X }}
+  WHILE X ≠ m DO
+    {{ Y = 2 ^ (X + 1) - 1 /\ Z = 2 ^ X /\ X <> m }} ->>
+    {{ Y + 2 * Z = 2 ^ (X + 2) - 1 /\ 2 * Z = 2 ^ (X + 1)}}  
+    Z ::= 2 * Z;;
+    {{ Y + Z = 2 ^ (X + 2) - 1 /\ Z = 2 ^ (X + 1) }}
+    Y ::= Y + Z;;
+    {{ Y = 2 ^ (X + 2) - 1 /\ Z = 2 ^ (X + 1) }}
+    X ::= X + 1
+    {{ Y = 2 ^ (X + 1) - 1 /\ Z = 2 ^ X }}
+  END
+  {{ Y = 2 ^ (X + 1) - 1 /\ Z = 2 ^ X /\ X = m  }} ->>
+  {{ Y = 2 ^ (m + 1) - 1 }}
+*)
+
+Definition is_wp P c Q :=
+  {{P}} c {{Q}} /\
+  forall P', {{P'}} c {{Q}} -> (P' ->> P).
+
+(*
+  1) {{ X = 5 }}  SKIP  {{ X = 5 }}
+
+  2) {{ Y + Z = 5 }}  X ::= Y + Z {{ X = 5 }}
+
+  3) {{ True }}  X ::= Y  {{ X = Y }}
+
+  4) {{ (X = 0 /\ Z = 4) \/ (X <> 0 /\ W = 3) }}
+     IFB X == 0 THEN Y ::= Z + 1 ELSE Y ::= W + 2 FI
+     {{ Y = 5 }}
+
+  5) {{ False }}
+     X ::= 5
+     {{ X = 0 }}
+
+  6) {{ True }}
+     WHILE True DO X ::= 0 END
+     {{ X = 0 }}
+  Note here:  hoare_triple asserts that the postcondition must hold only when the command terminates. 
+
+*)
