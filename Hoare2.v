@@ -365,3 +365,40 @@ Definition is_wp P c Q :=
   Note here:  hoare_triple asserts that the postcondition must hold only when the command terminates. 
 
 *)
+
+Theorem is_wp_example :
+  is_wp (fun st => st Y <= 4)
+    (X ::= APlus (AId Y) (ANum 1)) (fun st => st X <= 5).
+Proof.
+  unfold is_wp. split.
+  - eapply hoare_consequence_pre. apply hoare_asgn. unfold assn_sub, assert_implies, t_update.
+    intros st H. simpl. omega.
+  - intros. unfold assert_implies.  
+    assert (
+      {{P'}} X ::= APlus (AId Y) (ANum 1) ;; Y ::= AMinus (AId X) (ANum 1) {{fun st : state => st Y <= 4}}
+    ). {
+      eapply hoare_seq. apply hoare_asgn. unfold assn_sub. unfold hoare_triple. intros. apply H in H0. apply H0 in H1.
+      rewrite t_update_eq. simpl. omega.
+    }
+    unfold hoare_triple in H0. intros st H1. 
+    remember (t_update st X (aeval st (APlus (AId Y) (ANum 1)))) as st1.
+    remember (t_update st1 Y (aeval st1 (AMinus (AId X) (ANum 1)))) as st2.
+    assert  ((X ::= APlus (AId Y) (ANum 1);; Y ::= AMinus (AId X) (ANum 1)) / st \\ st2). {
+      rewrite Heqst2. apply E_Seq with st1.
+      + rewrite Heqst1. apply E_Ass. reflexivity.
+      + apply E_Ass. reflexivity.
+    }
+    assert (st Y = st2 Y). { rewrite Heqst2. rewrite t_update_eq. rewrite Heqst1. simpl. rewrite t_update_eq. omega.
+    }
+    rewrite H3. apply H0 with st; assumption.
+Qed.
+
+Theorem hoare_asgn_weakest : forall Q X a,
+  is_wp (Q [X |-> a]) (X ::= a) Q.
+Proof.
+  unfold is_wp. split.
+  - apply hoare_asgn.
+  - intros. unfold assert_implies. unfold assn_sub. unfold hoare_triple in H.
+    intros st. assert ((X ::= a) / st \\ (t_update st X (aeval st a))). { apply E_Ass. reflexivity. }
+    intros H1. apply H with st; assumption.
+Qed.
