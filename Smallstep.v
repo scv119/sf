@@ -168,3 +168,15 @@ Proof.
     + inversion H. subst. inversion H3.
     + apply IHHy1 in H4. rewrite H4. reflexivity.
 Qed.
+
+Theorem strong_progress : forall t,
+  value t \/ (exists t', t => t').
+Proof.
+  intros t. induction t.
+  - left. constructor.
+  - inversion IHt1.
+   + destruct IHt2.
+    * right. destruct H0. destruct H. exists (C (n0 + n)). constructor.
+    * right. destruct H0. exists (P t1 x). apply  ST_Plus2; assumption.
+   +  destruct H. right. exists (P x t2). apply ST_Plus1. assumption.
+Qed.
