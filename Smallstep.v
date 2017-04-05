@@ -180,3 +180,119 @@ Proof.
     * right. destruct H0. exists (P t1 x). apply  ST_Plus2; assumption.
    +  destruct H. right. exists (P x t2). apply ST_Plus1. assumption.
 Qed.
+
+Definition normal_form {X: Type} (R: relation X) (t: X) : Prop  :=
+  ~ exists t', R t t'.
+
+Lemma value_is_nf : forall v,
+  value v -> normal_form step v.
+Proof.
+  intros. unfold normal_form. unfold not. intros. destruct H0. destruct H. inversion H0.
+Qed.
+
+Lemma nf_is_value : forall t,
+  normal_form step t -> value t.
+Proof.
+  unfold normal_form. intros. 
+  assert (G : value t \/ exists t', t => t').
+  { (* Proof of assertion *) apply strong_progress. }
+  inversion G.
+  - assumption.
+  - exfalso. apply H. assumption.
+Qed.
+
+Corollary nf_same_as_value : forall t,
+  normal_form step t <-> value t.
+Proof.
+  split. apply nf_is_value. apply value_is_nf. Qed.
+
+Module Temp1.
+
+Inductive value : tm -> Prop :=
+| v_const : forall n, value (C n)
+| v_funny : forall t1 n2, (* <---- *)
+              value (P t1 (C n2)).
+
+Reserved Notation " t '=>' t' " (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_PlusConstConst : forall n1 n2,
+      P (C n1) (C n2) => C (n1 + n2)
+  | ST_Plus1 : forall t1 t1' t2,
+      t1 => t1' ->
+      P t1 t2 => P t1' t2
+  | ST_Plus2 : forall v1 t2 t2',
+      value v1 ->
+      t2 => t2' ->
+      P v1 t2 => P v1 t2'
+
+  where " t '=>' t' " := (step t t').
+
+Lemma value_not_same_as_normal_form :
+  exists v, value v /\ ~ normal_form step v.
+Proof.
+  exists (P (C 1) (C 2)). split.
+  - apply v_funny.
+  - unfold not, normal_form. intros. apply H. exists (C (1 + 2)). constructor.
+Qed. 
+
+End Temp1.
+
+Module Temp2.
+
+Inductive value : tm -> Prop :=
+| v_const : forall n, value (C n).
+
+Reserved Notation " t '=>' t' " (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_Funny : forall n, (* <---- *)
+      C n => P (C n) (C 0)
+  | ST_PlusConstConst : forall n1 n2,
+      P (C n1) (C n2) => C (n1 + n2)
+  | ST_Plus1 : forall t1 t1' t2,
+      t1 => t1' ->
+      P t1 t2 => P t1' t2
+  | ST_Plus2 : forall v1 t2 t2',
+      value v1 ->
+      t2 => t2' ->
+      P v1 t2 => P v1 t2'
+
+  where " t '=>' t' " := (step t t').
+
+Lemma value_not_same_as_normal_form :
+  exists v, value v /\ ~ normal_form step v.
+Proof.
+  exists (C 1). split.
+  - constructor.
+  - unfold not, normal_form. intros. apply H. exists (P (C 1) (C 0)). constructor.
+Qed.
+
+End Temp2.
+
+Module Temp3.
+
+Inductive value : tm ->  Prop :=
+  | v_const : forall n, value (C n).
+
+Reserved Notation " t '=>' t' " (at level 40).
+
+Inductive step : tm ->  tm ->  Prop :=
+  | ST_PlusConstConst : forall n1 n2,
+      P (C n1) (C n2) => C (n1 + n2)
+  | ST_Plus1 : forall t1 t1' t2,
+      t1 => t1' -> 
+      P t1 t2 => P t1' t2
+
+  where " t '=>' t' " := (step t t').
+
+
+Lemma value_not_same_as_normal_form :
+  exists t, ~ value t /\ normal_form step t.
+Proof.
+  exists  (P (C 1) (P (C 1) (C 1))). split.
+  -  unfold not. intros. inversion H.
+  - unfold normal_form, not. intros. destruct H. inversion H. inversion H3.
+Qed.
+
+End Temp3.
