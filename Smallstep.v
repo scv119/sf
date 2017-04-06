@@ -296,3 +296,176 @@ Proof.
 Qed.
 
 End Temp3.
+
+Module Temp4.
+
+Inductive tm : Type :=
+  | ttrue : tm
+  | tfalse : tm
+  | tif : tm -> tm -> tm -> tm.
+
+Inductive value : tm -> Prop :=
+  | v_true : value ttrue
+  | v_false : value tfalse.
+
+Reserved Notation " t '=>' t' " (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_IfTrue : forall t1 t2,
+      tif ttrue t1 t2 => t1
+  | ST_IfFalse : forall t1 t2,
+      tif tfalse t1 t2 => t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 => t1' ->
+      tif t1 t2 t3 => tif t1' t2 t3
+
+  where " t '=>' t' " := (step t t').
+
+Theorem strong_progress : forall t,
+  value t \/ (exists t', t => t').
+Proof.
+  intros t. induction t.
+  - left. constructor.
+  - left. constructor.
+  - destruct IHt1.
+    + destruct H. 
+      * right. exists t2. constructor.
+      * right. exists t3. constructor.
+    + destruct H. right. exists (tif x t2 t3). constructor. assumption.
+Qed.
+
+Theorem step_deterministic :
+  deterministic step.
+Proof.
+  unfold deterministic. intros x y1 y2 H.
+  generalize dependent y2.
+ induction H.
+  - intros. inversion H. 
+    + reflexivity.
+    + subst. inversion H4.
+  - intros. inversion H.
+    + reflexivity.
+    + subst. inversion H4.
+  - intros. inversion H0.
+    + rewrite <- H2 in H. inversion H.
+    + rewrite <- H2 in H. inversion H.
+    + apply IHstep in H5. rewrite H5. reflexivity.
+Qed.
+
+Module Temp5.
+
+Reserved Notation " t '=>' t' " (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_IfTrue : forall t1 t2,
+      tif ttrue t1 t2 => t1
+  | ST_IfFalse : forall t1 t2,
+      tif tfalse t1 t2 => t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 => t1' ->
+      tif t1 t2 t3 => tif t1' t2 t3
+  | ST_ShortCircuit : forall t t',
+      (t' = ttrue \/ t' = tfalse) ->
+      tif t t' t' => t'
+
+  where " t '=>' t' " := (step t t').
+
+Definition bool_step_prop4 :=
+         tif
+            (tif ttrue ttrue ttrue)
+            tfalse
+            tfalse
+     =>
+         tfalse.
+
+Example bool_step_prop4_holds :
+  bool_step_prop4.
+Proof.
+  apply ST_ShortCircuit. right. reflexivity.
+Qed.
+
+Theorem not_step_deterministic :
+  ~(deterministic step).
+Proof.
+  unfold not, deterministic. intros. assert (Contra: tfalse = (  tif
+            ttrue
+            tfalse
+            tfalse )).
+  { apply H with (          tif
+            (tif ttrue ttrue ttrue)
+            tfalse
+            tfalse ).
+    - apply ST_ShortCircuit. right. reflexivity.
+    - apply ST_If. constructor.
+  }
+  inversion Contra.
+Qed.
+
+Theorem strong_progress : forall t,
+  value t \/ (exists t', t => t').
+Proof.
+  Admitted.
+
+(* In general, is there any way we could cause strong progress to fail if we took away one or more constructors from the original step relation? Write yes or no and briefly (1 sentence) explain your answer.
+ Yes, remove ST_IFTrue then tif ttrue t1 t2 will be stuck. *)
+
+End Temp5.
+End Temp4.
+
+
+Inductive multi {X:Type} (R: relation X) : relation X :=
+  | multi_refl : forall (x : X), multi R x x
+  | multi_step : forall (x y z : X),
+                    R x y ->
+                    multi R y z ->
+                    multi R x z.
+
+Notation " t '=>*' t' " := (multi step t t') (at level 40).
+
+Theorem multi_R : forall (X:Type) (R:relation X) (x y : X),
+       R x y -> (multi R) x y.
+Proof.
+   intros. apply multi_step with y. assumption. constructor. Qed.
+
+Theorem multi_trans :
+  forall (X:Type) (R: relation X) (x y z : X),
+      multi R x y ->
+      multi R y z ->
+      multi R x z.
+Proof.
+  intros X R x y z G H.
+  induction G.
+    - (* multi_refl *) assumption.
+    - (* multi_step *)
+      apply multi_step with y. assumption.
+      apply IHG. assumption. Qed.
+
+Lemma test_multistep_1':
+      P
+        (P (C 0) (C 3))
+        (P (C 2) (C 4))
+  =>*
+      C ((0 + 3) + (2 + 4)).
+Proof.
+  eapply multi_step. apply ST_Plus1. apply ST_PlusConstConst.
+  eapply multi_step. apply ST_Plus2. apply v_const.
+  apply ST_PlusConstConst.
+  eapply multi_step. apply ST_PlusConstConst.
+  apply multi_refl. Qed.
+
+Lemma test_multistep_4:
+      P
+        (C 0)
+        (P
+          (C 2)
+          (P (C 0) (C 3)))
+  =>*
+      P
+        (C 0)
+        (C (2 + (0 + 3))).
+Proof.
+  eapply multi_step. apply ST_Plus2. constructor.
+  apply ST_Plus2. constructor.  apply ST_PlusConstConst.
+  eapply multi_step. apply ST_Plus2.  constructor. apply ST_PlusConstConst. 
+  constructor.
+Qed.
