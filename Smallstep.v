@@ -469,3 +469,76 @@ Proof.
   eapply multi_step. apply ST_Plus2.  constructor. apply ST_PlusConstConst. 
   constructor.
 Qed.
+
+Definition step_normal_form := normal_form step.
+
+Definition normal_form_of (t t' : tm) :=
+  (t =>* t' /\ step_normal_form t').
+
+Theorem normal_form_unique:
+  deterministic normal_form_of.
+Proof.
+  (* We recommend using this initial setup as-is! *)
+  unfold deterministic. unfold normal_form_of.
+  intros x y1 y2 P1 P2.
+  inversion P1 as [P11 P12]; clear P1.
+  inversion P2 as [P21 P22]; clear P2.
+  generalize dependent y2.
+  induction P11.
+  - intros. unfold step_normal_form in P12. destruct P21.
+    + reflexivity.
+    + unfold normal_form in P12. exfalso. apply P12. exists y. assumption.
+  - intros. destruct P21.
+    + exfalso. unfold step_normal_form in P22. unfold normal_form in P22. apply P22.
+      exists y. assumption.
+    + assert (y = y0). { apply step_deterministic with x; assumption. } subst.
+      apply IHP11; assumption.
+Qed.
+
+Definition normalizing {X:Type} (R:relation X) :=
+  forall t, exists t',
+    (multi R) t t' /\ normal_form R t'.
+
+Lemma multistep_congr_1 : forall t1 t1' t2,
+     t1 =>* t1' ->
+     P t1 t2 =>* P t1' t2.
+Proof.
+  intros t1 t1' t2 H. induction H.
+    - (* multi_refl *) apply multi_refl.
+    - (* multi_step *) apply multi_step with (P y t2).
+        apply ST_Plus1. apply H.
+        apply IHmulti. Qed.
+
+Lemma multistep_congr_2 : forall t1 t2 t2',
+     value t1 ->
+     t2 =>* t2' ->
+     P t1 t2 =>* P t1 t2'.
+Proof.
+  intros. induction H0.
+  - constructor.
+  - apply multi_step with (P t1 y).
+    + constructor; assumption.
+    + assumption.
+Qed.
+
+Theorem step_normalizing :
+  normalizing step.
+Proof.
+  unfold normalizing.
+  induction t.
+  - exists (C n). split.
+    + constructor.
+    + rewrite nf_same_as_value. constructor.
+  -       inversion IHt1 as [t1' H1]; clear IHt1.
+      inversion IHt2 as [t2' H2]; clear IHt2.
+      inversion H1 as [H11 H12]; clear H1. inversion H2 as [H21 H22]; clear H2.
+      rewrite nf_same_as_value in H12. rewrite nf_same_as_value in H22.
+      inversion H12 as [n1]. inversion H22 as [n2]. subst.
+      exists (C (n1 + n2)). split.
+     + assert (P t1 t2 =>* P (C n1) t2). {  apply multistep_congr_1. assumption. }
+       assert (P (C n1) t2 =>* P (C n1) (C n2)). { apply multistep_congr_2; assumption. }
+       assert (P t1 t2 =>* P (C n1) (C n2)). { apply multi_trans with (P (C n1) t2); assumption. }
+       assert (P (C n1) (C n2) =>* C (n1 + n2)). {  apply multi_step with (C (n1 + n2)); constructor. } 
+       apply multi_trans with (P (C n1) (C n2)); assumption.
+     +  rewrite nf_same_as_value. constructor.
+Qed.
