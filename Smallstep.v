@@ -542,3 +542,117 @@ Proof.
        apply multi_trans with (P (C n1) (C n2)); assumption.
      +  rewrite nf_same_as_value. constructor.
 Qed.
+
+
+Theorem eval__multistep: forall t n,
+  t \\ n -> t =>* C n.
+Proof.
+  intros. induction H.
+  - constructor.
+  - assert (P t1 t2 =>* P (C n1) t2).  { apply multistep_congr_1. assumption. }
+    assert (P (C n1) t2 =>* P (C n1) (C n2)). { apply multistep_congr_2. constructor. assumption. }
+    assert (P t1 t2 =>* P (C n1) (C n2)). 
+    {
+      eapply multi_trans. apply H1. assumption.
+    }
+    eapply multi_trans. apply H3. apply multi_step with (C (n1 + n2)); constructor.
+Qed.
+
+Lemma step__eval : forall t t' n,
+  t => t' ->
+  t' \\ n ->
+  t \\ n.
+Proof.
+  intros t t' n Hs. generalize dependent n. 
+  induction Hs.
+  - intros. inversion H. apply E_Plus; constructor.
+  - intros. inversion H. subst. apply E_Plus. apply IHHs. assumption. assumption.
+  - intros. inversion H0. subst. apply E_Plus. assumption. apply IHHs. assumption.
+Qed.
+
+Theorem multistep__eval : forall t t',
+  normal_form_of t t' -> exists n, t' = C n /\ t \\ n.
+Proof.
+  unfold normal_form_of. unfold step_normal_form. intros.
+  destruct H. induction H.
+  - apply nf_is_value in H0.  inversion H0. exists n. split. reflexivity. constructor.
+  - apply IHmulti in H0. inversion H0. inversion H2. exists x0. split. assumption.
+    apply step__eval with y; assumption.
+Qed.
+
+Theorem evalF_eval : forall t n,
+  evalF t = n <-> t \\ n.
+Proof.
+  split.
+  - intros. generalize dependent n. induction t.
+    + intros. simpl in H. subst. constructor.
+    + intros. simpl in H. remember (evalF t1) as n0. remember (evalF t2) as n1.
+      rewrite <- H. assert (t1 \\ n0). { apply IHt1. reflexivity. } 
+      assert (t2 \\ n1). { apply IHt2. reflexivity. }
+      apply E_Plus; assumption.
+  - intros. induction H.
+    + reflexivity.
+    + simpl. subst. reflexivity.
+Qed.
+
+Module Combined.
+
+Inductive tm : Type :=
+  | C : nat -> tm
+  | P : tm -> tm -> tm
+  | ttrue : tm
+  | tfalse : tm
+  | tif : tm -> tm -> tm -> tm.
+
+Inductive value : tm -> Prop :=
+  | v_const : forall n, value (C n)
+  | v_true : value ttrue
+  | v_false : value tfalse.
+
+Reserved Notation " t '=>' t' " (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_PlusConstConst : forall n1 n2,
+      P (C n1) (C n2) => C (n1 + n2)
+  | ST_Plus1 : forall t1 t1' t2,
+      t1 => t1' ->
+      P t1 t2 => P t1' t2
+  | ST_Plus2 : forall v1 t2 t2',
+      value v1 ->
+      t2 => t2' ->
+      P v1 t2 => P v1 t2'
+  | ST_IfTrue : forall t1 t2,
+      tif ttrue t1 t2 => t1
+  | ST_IfFalse : forall t1 t2,
+      tif tfalse t1 t2 => t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 => t1' ->
+      tif t1 t2 t3 => tif t1' t2 t3
+
+  where " t '=>' t' " := (step t t').
+
+Theorem step_deterministic:
+  deterministic step.
+Proof.
+  unfold deterministic. intros x y1 y2 Hy1 Hy2.
+  generalize dependent y2.
+  induction Hy1; intros y2 Hy2;
+    inversion Hy2; subst; try solve_by_invert; try reflexivity.
+  -  apply IHHy1 in H2. rewrite H2. reflexivity.
+  - destruct H1; inversion Hy1.
+  - destruct H; inversion H3.
+  - apply IHHy1 in H4. subst. reflexivity.
+  - apply IHHy1 in H3. subst. reflexivity.
+Qed.
+
+Theorem not_strong_progress : exists t,
+  ~(value t) /\ ~(exists t', t => t').
+Proof.
+  exists (P (C 0) ttrue). split.
+  - unfold not. intros. inversion H.
+  - unfold not. intros. inversion H. inversion H0.
+    + inversion H4.
+    + inversion H5.
+Qed.
+
+End Combined.
