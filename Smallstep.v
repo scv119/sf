@@ -862,11 +862,54 @@ Proof.
   reflexivity. Qed.
 
 
-Lemma par_body_n__Sn : forall n st,
-  st X = n /\ st Y = 0 ->
-  par_loop / st =>* par_loop / (t_update st X (S n)).
-Proof.
-  intros. eapply multi_step. apply CS_Par2. apply CS_While.
-  eapply multi_step. apply CS_Par2. apply CS_IfStep.
-    apply BS_Eq1. apply AS_Id.
+End CImp.
+
+Definition stack := list nat.
+Definition prog := list sinstr.
+
+Inductive stack_step : state -> prog * stack -> prog * stack -> Prop :=
+  | SS_Push : forall st stk n p',
+    stack_step st (SPush n :: p', stk) (p', n :: stk)
+  | SS_Load : forall st stk i p',
+    stack_step st (SLoad i :: p', stk) (p', st i :: stk)
+  | SS_Plus : forall st stk n m p',
+    stack_step st (SPlus :: p', n::m::stk) (p', (m+n)::stk)
+  | SS_Minus : forall st stk n m p',
+    stack_step st (SMinus :: p', n::m::stk) (p', (m-n)::stk)
+  | SS_Mult : forall st stk n m p',
+    stack_step st (SMult :: p', n::m::stk) (p', (m*n)::stk).
   
+
+Theorem stack_step_deterministic : forall st,
+  deterministic (stack_step st).
+Proof.
+  unfold deterministic. intros st x y1 y2 H1 H2.
+  induction H1; inversion H2; reflexivity.
+Qed.
+
+Definition stack_multistep st := multi (stack_step st).
+
+Definition compiler_is_correct_statement : Prop :=
+  forall e st stk p, stack_multistep st ((s_compile e) ++ p, stk) (p, aeval st e :: stk).
+
+
+Theorem compiler_is_correct : compiler_is_correct_statement.
+Proof.
+  unfold compiler_is_correct_statement. intros e.
+  induction e; try (simpl; intros; eapply multi_step; constructor).
+  -  simpl. intros.
+     apply multi_trans with (s_compile e2 ++ [SPlus] ++ p, aeval st e1 :: stk).
+     rewrite <- app_assoc. rewrite <- (app_assoc (s_compile e2) [SPlus] p). apply IHe1.
+     apply multi_trans with  ([SPlus] ++ p, aeval st e2 :: aeval st e1 :: stk).
+     apply IHe2. eapply multi_step. constructor. simpl. constructor.
+  -  simpl. intros.
+       apply multi_trans with (s_compile e2 ++ [SMinus] ++ p, aeval st e1 :: stk).
+       rewrite <- app_assoc. rewrite <- (app_assoc (s_compile e2) [SMinus] p). apply IHe1.
+       apply multi_trans with  ([SMinus] ++ p, aeval st e2 :: aeval st e1 :: stk).
+       apply IHe2. eapply multi_step. constructor. simpl. constructor.
+  -  simpl. intros.
+       apply multi_trans with (s_compile e2 ++ [SMult] ++ p, aeval st e1 :: stk).
+       rewrite <- app_assoc. rewrite <- (app_assoc (s_compile e2) [SMult] p). apply IHe1.
+       apply multi_trans with  ([SMult] ++ p, aeval st e2 :: aeval st e1 :: stk).
+       apply IHe2. eapply multi_step. constructor. simpl. constructor.
+Qed.
