@@ -151,3 +151,111 @@ Example auto_example_8' : exists s',
     ELSE (Y ::= APlus (AId X) (AId Z))
   FI) / st12 \\ s'.
 Proof. info_eauto. Qed.
+
+
+Theorem ceval_deterministic': forall c st st1 st2,
+     c / st \\ st1 ->
+     c / st \\ st2 ->
+     st1 = st2.
+Proof.
+  intros c st st1 st2 E1 E2;
+  generalize dependent st2;
+  induction E1; intros st2 E2; inv E2; auto. 
+  - (* E_Seq *)
+    assert (st' = st'0) as EQ1 by auto.
+    subst st'0.
+    apply IHE1_2. auto.
+  - (* b evaluates to false (contradiction) *) 
+    rewrite H in H5. inversion H5.
+  (* E_IfFalse *)
+  - (* b evaluates to true (contradiction) *)
+    rewrite H in H5. inversion H5.
+  - (* b evaluates to true (contradiction) *)
+    rewrite H in H2. inversion H2.
+  (* E_WhileLoop *)
+  - (* b evaluates to false (contradiction) *)
+    rewrite H in H4. inversion H4.
+  - (* b evaluates to true *)
+    assert (st' = st'0) as EQ1 by auto.
+    subst st'0. auto.
+Qed.
+
+Theorem ceval_deterministic'_alt: forall c st st1 st2,
+     c / st \\ st1 ->
+     c / st \\ st2 ->
+     st1 = st2.
+Proof with auto.
+  intros c st st1 st2 E1 E2;
+  generalize dependent st2;
+  induction E1; intros st2 E2; inv E2... 
+  - (* E_Seq *)
+    assert (st' = st'0) as EQ1...
+    subst st'0.
+    apply IHE1_2...
+  - (* b evaluates to false (contradiction) *) 
+    rewrite H in H5. inversion H5.
+  (* E_IfFalse *)
+  - (* b evaluates to true (contradiction) *)
+    rewrite H in H5. inversion H5.
+  - (* b evaluates to true (contradiction) *)
+    rewrite H in H2. inversion H2.
+  (* E_WhileLoop *)
+  - (* b evaluates to false (contradiction) *)
+    rewrite H in H4. inversion H4.
+  - (* b evaluates to true *)
+    assert (st' = st'0) as EQ1...
+    subst st'0...
+Qed.
+
+Ltac rwinv H1 H2 := rewrite H1 in H2; inv H2.
+
+Ltac find_rwinv :=
+  match goal with
+    H1: ?E = true, H2: ?E = false |- _ => rwinv H1 H2
+  end.
+
+Theorem ceval_deterministic''': forall c st st1 st2,
+     c / st \\ st1 ->
+     c / st \\ st2 ->
+     st1 = st2.
+Proof.
+  intros c st st1 st2 E1 E2;
+  generalize dependent st2;
+  induction E1; intros st2 E2; inv E2; try find_rwinv; auto. 
+  - (* E_Seq *)
+    assert (st' = st'0) as EQ1 by auto.
+    subst st'0.
+    apply IHE1_2. auto.
+  - (* b evaluates to true *)
+    assert (st' = st'0) as EQ1 by auto.
+    subst st'0. auto.
+Qed.
+
+Theorem ceval_deterministic'''': forall c st st1 st2,
+     c / st \\ st1 ->
+     c / st \\ st2 ->
+     st1 = st2.
+Proof.
+  intros c st st1 st2 E1 E2;
+  generalize dependent st2;
+  induction E1; intros st2 E2; inv E2; try find_rwinv; auto. 
+  - (* E_Seq *)
+    rewrite (IHE1_1 st'0 H1) in *. auto.
+  - (* b evaluates to true *)
+     rewrite (IHE1_1 st'0 H3) in *. auto. Qed.
+
+Ltac find_eqn :=
+  match goal with
+    H1: forall x, ?P x -> ?L = ?R, H2: ?P ?X |- _ =>
+         rewrite (H1 X H2) in *
+  end.
+
+Theorem ceval_deterministic''''': forall c st st1 st2,
+     c / st \\ st1 ->
+     c / st \\ st2 ->
+     st1 = st2.
+Proof.
+  intros c st st1 st2 E1 E2;
+  generalize dependent st2;
+  induction E1; intros st2 E2; inv E2; try find_rwinv; repeat find_eqn; auto.
+Qed. 
