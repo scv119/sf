@@ -115,6 +115,164 @@ Proof with eauto.
     unfold step_normal_form in H. exfalso. apply H. eauto.
     + apply f_equal. auto.
 Qed.
-    
-  
 
+Inductive ty : Type :=
+  | TBool : ty
+  | TNat : ty.
+
+Reserved Notation "'|-' t '\in' T" (at level 40).
+
+Inductive has_type : tm -> ty -> Prop :=
+  | T_True :
+       |- ttrue \in TBool
+  | T_False :
+       |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T,
+       |- t1 \in TBool ->
+       |- t2 \in T ->
+       |- t3 \in T ->
+       |- tif t1 t2 t3 \in T
+  | T_Zero :
+       |- tzero \in TNat
+  | T_Succ : forall t1,
+       |- t1 \in TNat ->
+       |- tsucc t1 \in TNat
+  | T_Pred : forall t1,
+       |- t1 \in TNat ->
+       |- tpred t1 \in TNat
+  | T_Iszero : forall t1,
+       |- t1 \in TNat ->
+       |- tiszero t1 \in TBool
+
+where "'|-' t '\in' T" := (has_type t T).
+
+Hint Constructors has_type.
+
+Example has_type_1 :
+  |- tif tfalse tzero (tsucc tzero) \in TNat.
+Proof.
+  apply T_If.
+    - apply T_False.
+    - apply T_Zero.
+    - apply T_Succ.
+       + apply T_Zero.
+Qed.
+
+Example has_type_not :
+  ~ (|- tif tfalse tzero ttrue \in TBool).
+Proof.
+  intros Contra. solve_by_inverts 2. Qed.
+
+Example succ_hastype_nat__hastype_nat : forall t,
+  |- tsucc t \in TNat ->
+  |- t \in TNat.
+Proof.
+  intros. inversion H. assumption.
+Qed.
+
+
+Lemma bool_canonical : forall t,
+  |- t \in TBool -> value t -> bvalue t.
+Proof.
+  intros t HT HV.
+  inversion HV; auto.
+  induction H; inversion HT; auto.
+Qed.
+
+Lemma nat_canonical : forall t,
+  |- t \in TNat -> value t -> nvalue t.
+Proof.
+  intros t HT HV.
+  inversion HV.
+  inversion H; subst; inversion HT.
+  auto.
+Qed.
+
+Theorem progress : forall t T,
+  |- t \in T ->
+  value t \/ exists t', t => t'.
+Proof with auto.
+  intros t T HT.
+  induction HT...
+  (* The cases that were obviously values, like T_True and
+     T_False, were eliminated immediately by auto *)
+  - (* T_If *)
+    right. inversion IHHT1; clear IHHT1.
+    + (* t1 is a value *)
+    apply (bool_canonical t1 HT1) in H.
+    inversion H; subst; clear H.
+      exists t2...
+      exists t3...
+    + (* t1 can take a step *)
+      inversion H as [t1' H1].
+     exists (tif t1' t2 t3)...
+  - (* T_Succ *)
+    inversion IHHT.
+    + left. apply (nat_canonical t1 HT) in H. auto.
+    + inversion H. right. exists (tsucc x)...
+  - (* T_Pred *)
+    inversion IHHT.
+    + right. apply (nat_canonical t1 HT) in H. inversion H.
+      exists tzero... 
+      exists t...
+    + inversion H. right. exists (tpred x)...
+  - (* T_Iszero *)
+    right. inversion IHHT.  
+    + apply (nat_canonical t1 HT) in H.  inversion H. 
+      exists ttrue...
+      exists tfalse...
+    + inversion H. exists (tiszero x)...
+Qed.
+
+(*
+
+Exercise: 3 stars, advanced (finish_progress_informal)
+Complete the corresponding informal proof:
+Theorem: If ⊢ t ∈ T, then either t is a value or else t ⇒ t' for some t'.
+Proof: By induction on a derivation of ⊢ t ∈ T.
+
+  If the last rule in the derivation is T_If, then t = if t1 then t2 else t3, with ⊢ t1 ∈ Bool,
+    ⊢ t2 ∈ T and ⊢ t3 ∈ T. By the IH, either t1 is a value or else t1 can step to some t1'.
+
+    If t1 is a value, then by the canonical forms lemmas and the fact that ⊢ t1 ∈ Bool we have
+    that t1 is a bvalue — i.e., it is either true or false. If t1 = true, then t steps to t2 by ST_IfTrue, 
+    while if t1 = false, then t steps to t3 by ST_IfFalse. Either way, t can step, which is what we wanted to 
+    show.
+    
+    If t1 itself can take a step, then, by ST_If, so can t.
+
+  If the laste rule in the derivation is T_Succ, then t = tsucc t1 with  ⊢ t1 ∈ Nat, By the IH
+  either t1 is a value or else t1 can step to some t1'.
+    
+    If t1 is a value, then by the canonical forms lemma and the fact that |- t1 \in Nat we have
+    that t1 is a nvalue. By apply nv_succ we know that tsucc t1 is also a nvalue, and a value.
+
+    If t1 itself can take a step, then, by ST_Succ, so can t.
+
+  If the last rule in the derivation is T_Pred, then t = tpred t1 with  ⊢ t1 ∈ Nat, By the IH
+  either t1 is a value or else t1 can step to some t1'.
+
+    If t1 is a value, then by the canonical forms lemma and the fact that |- t1 \in Nat we have
+    that t1 is a nvalue. By inverse the nvalue, we know t1 should either be tzero or tsucc some t2 and t2
+    is nvalue.
+      
+      If t1 is tzero, we know t is also tzero value by ST_PredZero.
+      If t1 is tsucc t2, we know t is also nvalue by ST_PredSucc.
+    
+    If t1 can step to some t1', then we know that tpred t1 could step to pred t1' by ST_Pred.
+
+  If the last rule in the derivation is T_Iszero, then t = tiszero t1 with  ⊢ t1 ∈ Nat, By the IH
+  either t1 is a value or else t1 can step to some t1'.
+    
+    If t1 is value. then by the canonical forms lemma and the fact that |- t1 \in Nat we have
+    that t1 is a nvalue. By analyze t1 we know t1 should either be tzero or tsucc of some t2.
+      
+      If ti is tzero we have t could step to tsuccse by ST_IszeroZero.
+      If t1 is tsucc some t2, t oculd step to tfalse by ST_IszeroSucc.
+
+    If t1 can step to some t1', then we know tiszero t1 could step to tiszero t1' by ST_Iszero.
+
+  For else cases, they are just tzero/ttrue/tfalse which could be aproved.
+
+Qed.
+*)
