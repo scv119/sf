@@ -276,3 +276,17 @@ Proof: By induction on a derivation of ⊢ t ∈ T.
 
 Qed.
 *)
+
+(*
+
+Exercise: 1 star (step_review)
+Quick review: answer true or false. In this language...
+Every well-typed normal form is a value.  
+yes, immediate result of lemma progress.
+Every value is a normal form.
+yes.
+The single-step reduction relation is a partial function (i.e., it is deterministic).
+Yes. by lemma step_deterministic.
+The single-step reduction relation is a total function.
+No, some of the t in tm could be stuck.
+*)
