@@ -290,3 +290,42 @@ Yes. by lemma step_deterministic.
 The single-step reduction relation is a total function.
 No, some of the t in tm could be stuck.
 *)
+
+
+Theorem preservation : forall t t' T,
+  |- t \in T ->
+    t => t' ->
+  |- t' \in T.
+
+Proof with auto.
+  intros t t' T HT HE.
+  generalize dependent t'.
+  induction HT;
+         (* every case needs to introduce a couple of things *)
+         intros t' HE;
+         (* and we can deal with several impossible
+            cases all at once *)
+         try solve_by_invert.
+    - (* T_If *) inversion HE; subst; clear HE.
+      + (* ST_IFTrue *) assumption.
+      + (* ST_IfFalse *) assumption.
+      + (* ST_If *) apply T_If; try assumption.
+        apply IHHT1; assumption.
+    - inversion HE; subst; clear HE. apply IHHT in H0. auto.
+    - inversion HE; subst; clear HE.
+      + auto.
+      + clear IHHT. clear HT. induction H0; auto. 
+      + apply IHHT in H0. auto.
+    - inversion HE; subst; clear HE; auto.
+Qed.
+
+Theorem preservation' : forall t t' T,
+  |- t \in T ->
+    t => t' ->
+  |- t' \in T.
+Proof with auto.
+  intros t t' T HT HE.
+  generalize dependent T.
+  induction HE; try (intros T HT; inversion HT; subst; clear HT; auto).
+  clear H1.  induction H; auto.
+Qed. 
