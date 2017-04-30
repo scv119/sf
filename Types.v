@@ -228,7 +228,7 @@ Qed.
 
 Exercise: 3 stars, advanced (finish_progress_informal)
 Complete the corresponding informal proof:
-Theorem: If ⊢ t ∈ T, then either t is a value or else t ⇒ t' for some t'.
+Theorem: If ⊢ t ∈ T, then either t is a value or else t => t' for some t'.
 Proof: By induction on a derivation of ⊢ t ∈ T.
 
   If the last rule in the derivation is T_If, then t = if t1 then t2 else t3, with ⊢ t1 ∈ Bool,
@@ -328,4 +328,122 @@ Proof with auto.
   generalize dependent T.
   induction HE; try (intros T HT; inversion HT; subst; clear HT; auto).
   clear H1.  induction H; auto.
-Qed. 
+Qed.
+
+Definition multistep := (multi step).
+Notation "t1 '=>*' t2" := (multistep t1 t2) (at level 40).
+
+Corollary soundness : forall t t' T,
+  |- t \in T ->
+  t =>* t' ->
+  ~(stuck t').
+Proof.
+  intros t t' T HT P. induction P; intros [R S].
+  destruct (progress x T HT); auto.
+  apply IHP. apply (preservation x y T HT H).
+  unfold stuck. split; auto. Qed. 
+
+Notation " t '/' st '=>a*' t' " := (multi (astep st) t t')
+                                    (at level 40, st at level 39).
+
+Example astep_example1 :
+  (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state
+  =>a* (ANum 15).
+Proof.
+  apply multi_step with (APlus (ANum 3) (ANum 12)).
+    apply AS_Plus2.
+      apply av_num.
+      apply AS_Mult.
+  apply multi_step with (ANum 15).
+    apply AS_Plus.
+  apply multi_refl.
+Qed.
+
+Hint Constructors astep aval.
+Example astep_example1' :
+  (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state
+  =>a* (ANum 15).
+Proof.
+  eapply multi_step. auto. simpl.
+  eapply multi_step. auto. simpl.
+  apply multi_refl.
+Qed.
+
+Tactic Notation "normalize" :=
+   repeat (eapply multi_step ;
+             [ (eauto 10; fail) | (instantiate; simpl)]);
+   apply multi_refl.
+
+Example astep_example1''' : exists e',
+  (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state
+  =>a* e'.
+Proof.
+  eapply ex_intro. normalize.
+Qed.
+
+Theorem normalize_ex : exists e',
+  (AMult (ANum 3) (AMult (ANum 2) (ANum 1))) / empty_state
+  =>a* e'.
+Proof.
+  eapply ex_intro. normalize.
+Qed.
+
+Theorem subject_expansion_false:
+  exists t t' T,
+  t => t' -> |- t' \in T -> ~(|- t \in T).
+Proof.
+  exists (tif ttrue ttrue tzero), ttrue, TBool. intros. unfold not. intros. solve_by_inverts 2.
+Qed.
+
+(* variation 1
+Determinism of step : yes
+Progress:  false, example : tsucc ttrue has type TBool, but it's not a value and can't take step.
+Preservation: true.
+*)
+
+(* variation 2
+Determinism of step:  false, for example  (tif ttrue ttrue tfalse) could step to both ttrue and tfalse.
+Progress: yes
+Preservation: yes *)
+
+(* variation 3
+
+Determinism of step:  false
+Progress: yes
+Preservation: yes  *)
+
+(* variation 4
+Determinism of step:  yes
+Progress: yes (ST_Funny3 can only apply to t without valid type)
+Preservation: yes  *)
+
+(* v5
+Determinism of step:  yes
+Progress: no (tif tzero ttrue tfalse) has valid type but stuck.
+Preservation: no (tif ttrue tzero (tsucc tzero)) has type TNat but => TBool.
+*)
+
+(* v6.
+Determinism of step:  yes
+Progress: seems yes
+Preservation: no, tpred tzero => tzero, tbool -> Tnat.
+*)
+
+(* remove_predzero
+
+Determinism: yes
+Progress: NO, tpred zero can't make progress
+Preservation: yes
+*)
+
+(* prog_pres_bigstep
+It should very similar to multi_step, but not reflective, so 
+Progress: 
+forall t T, |- t \in T -> value t \. exists t', t =>* t'.
+Preservation:
+Theorem preservation : forall t t' T,
+  ⊢ t ∈ T →
+  t ⇒* t' →
+  ⊢ t' ∈ T.
+
+*)
