@@ -30,37 +30,37 @@ Hint Constructors bvalue nvalue.
 Hint Unfold value.
 Hint Unfold update.
 
-Reserved Notation "t1 '=>' t2" (at level 40).
+Reserved Notation "t1 '==>' t2" (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_IfTrue : forall t1 t2,
-      (tif ttrue t1 t2) => t1
+      (tif ttrue t1 t2) ==> t1
   | ST_IfFalse : forall t1 t2,
-      (tif tfalse t1 t2) => t2
+      (tif tfalse t1 t2) ==> t2
   | ST_If : forall t1 t1' t2 t3,
-      t1 => t1' ->
-      (tif t1 t2 t3) => (tif t1' t2 t3)
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
   | ST_Succ : forall t1 t1',
-      t1 => t1' ->
-      (tsucc t1) => (tsucc t1')
+      t1 ==> t1' ->
+      (tsucc t1) ==> (tsucc t1')
   | ST_PredZero :
-      (tpred tzero) => tzero
+      (tpred tzero) ==> tzero
   | ST_PredSucc : forall t1,
       nvalue t1 ->
-      (tpred (tsucc t1)) => t1
+      (tpred (tsucc t1)) ==> t1
   | ST_Pred : forall t1 t1',
-      t1 => t1' ->
-      (tpred t1) => (tpred t1')
+      t1 ==> t1' ->
+      (tpred t1) ==> (tpred t1')
   | ST_IszeroZero :
-      (tiszero tzero) => ttrue
+      (tiszero tzero) ==> ttrue
   | ST_IszeroSucc : forall t1,
        nvalue t1 ->
-      (tiszero (tsucc t1)) => tfalse
+      (tiszero (tsucc t1)) ==> tfalse
   | ST_Iszero : forall t1 t1',
-      t1 => t1' ->
-      (tiszero t1) => (tiszero t1')
+      t1 ==> t1' ->
+      (tiszero t1) ==> (tiszero t1')
 
-where "t1 '=>' t2" := (step t1 t2).
+where "t1 '==>' t2" := (step t1 t2).
 
 Hint Constructors step.
 
@@ -190,7 +190,7 @@ Qed.
 
 Theorem progress : forall t T,
   |- t \in T ->
-  value t \/ exists t', t => t'.
+  value t \/ exists t', t ==> t'.
 Proof with auto.
   intros t T HT.
   induction HT...
@@ -228,7 +228,7 @@ Qed.
 
 Exercise: 3 stars, advanced (finish_progress_informal)
 Complete the corresponding informal proof:
-Theorem: If ⊢ t ∈ T, then either t is a value or else t => t' for some t'.
+Theorem: If ⊢ t ∈ T, then either t is a value or else t ==> t' for some t'.
 Proof: By induction on a derivation of ⊢ t ∈ T.
 
   If the last rule in the derivation is T_If, then t = if t1 then t2 else t3, with ⊢ t1 ∈ Bool,
@@ -294,7 +294,7 @@ No, some of the t in tm could be stuck.
 
 Theorem preservation : forall t t' T,
   |- t \in T ->
-    t => t' ->
+    t ==> t' ->
   |- t' \in T.
 
 Proof with auto.
@@ -321,7 +321,7 @@ Qed.
 
 Theorem preservation' : forall t t' T,
   |- t \in T ->
-    t => t' ->
+    t ==> t' ->
   |- t' \in T.
 Proof with auto.
   intros t t' T HT HE.
@@ -331,11 +331,11 @@ Proof with auto.
 Qed.
 
 Definition multistep := (multi step).
-Notation "t1 '=>*' t2" := (multistep t1 t2) (at level 40).
+Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 
 Corollary soundness : forall t t' T,
   |- t \in T ->
-  t =>* t' ->
+  t ==>* t' ->
   ~(stuck t').
 Proof.
   intros t t' T HT P. induction P; intros [R S].
@@ -343,12 +343,12 @@ Proof.
   apply IHP. apply (preservation x y T HT H).
   unfold stuck. split; auto. Qed. 
 
-Notation " t '/' st '=>a*' t' " := (multi (astep st) t t')
+Notation " t '/' st '==>a*' t' " := (multi (astep st) t t')
                                     (at level 40, st at level 39).
 
 Example astep_example1 :
   (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state
-  =>a* (ANum 15).
+  ==>a* (ANum 15).
 Proof.
   apply multi_step with (APlus (ANum 3) (ANum 12)).
     apply AS_Plus2.
@@ -362,7 +362,7 @@ Qed.
 Hint Constructors astep aval.
 Example astep_example1' :
   (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state
-  =>a* (ANum 15).
+  ==>a* (ANum 15).
 Proof.
   eapply multi_step. auto. simpl.
   eapply multi_step. auto. simpl.
@@ -376,21 +376,21 @@ Tactic Notation "normalize" :=
 
 Example astep_example1''' : exists e',
   (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state
-  =>a* e'.
+  ==>a* e'.
 Proof.
   eapply ex_intro. normalize.
 Qed.
 
 Theorem normalize_ex : exists e',
   (AMult (ANum 3) (AMult (ANum 2) (ANum 1))) / empty_state
-  =>a* e'.
+  ==>a* e'.
 Proof.
   eapply ex_intro. normalize.
 Qed.
 
 Theorem subject_expansion_false:
   exists t t' T,
-  t => t' -> |- t' \in T -> ~(|- t \in T).
+  t ==> t' -> |- t' \in T -> ~(|- t \in T).
 Proof.
   exists (tif ttrue ttrue tzero), ttrue, TBool. intros. unfold not. intros. solve_by_inverts 2.
 Qed.
@@ -420,13 +420,13 @@ Preservation: yes  *)
 (* v5
 Determinism of step:  yes
 Progress: no (tif tzero ttrue tfalse) has valid type but stuck.
-Preservation: no (tif ttrue tzero (tsucc tzero)) has type TNat but => TBool.
+Preservation: no (tif ttrue tzero (tsucc tzero)) has type TNat but ==> TBool.
 *)
 
 (* v6.
 Determinism of step:  yes
 Progress: seems yes
-Preservation: no, tpred tzero => tzero, tbool -> Tnat.
+Preservation: no, tpred tzero ==> tzero, tbool -> Tnat.
 *)
 
 (* remove_predzero
@@ -439,7 +439,7 @@ Preservation: yes
 (* prog_pres_bigstep
 It should very similar to multi_step, but not reflective, so 
 Progress: 
-forall t T, |- t \in T -> value t \. exists t', t =>* t'.
+forall t T, |- t \in T -> value t \. exists t', t ==>* t'.
 Preservation:
 Theorem preservation : forall t t' T,
   ⊢ t ∈ T →

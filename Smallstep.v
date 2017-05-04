@@ -7,6 +7,7 @@ Import ListNotations.
 Require Import Maps.
 Require Import Imp.
 
+
 Inductive tm : Type :=
   | C : nat -> tm (* Constant *)
   | P : tm -> tm -> tm. (* Plus *)
@@ -69,10 +70,12 @@ Proof. apply ST_Plus2. apply ST_Plus2.  apply ST_PlusConstConst. Qed.
 
 End SimpleArith1.
 
+
 Definition relation (X:Type) := X -> X -> Prop.
 
 Definition deterministic {X: Type} (R: relation X) :=
   forall x y1 y2 : X, R x y1 -> R x y2 -> y1 = y2.
+
 
 Module SimpleArith2.
 Import SimpleArith1.
@@ -133,21 +136,30 @@ End SimpleArith3.
 Inductive value : tm -> Prop :=
   v_const : forall n, value (C n).
 
-Reserved Notation " t '=>' t' " (at level 40).
+Reserved Notation " t '==>' t' " (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_PlusConstConst : forall n1 n2,
           P (C n1) (C n2)
-      => C (n1 + n2)
+      ==> C (n1 + n2)
   | ST_Plus1 : forall t1 t1' t2,
-        t1 => t1' ->
-        P t1 t2 => P t1' t2
+        t1 ==> t1' ->
+        P t1 t2 ==> P t1' t2
   | ST_Plus2 : forall v1 t2 t2',
         value v1 -> (* <----- n.b. *)
-        t2 => t2' ->
-        P v1 t2 => P v1 t2'
+        t2 ==> t2' ->
+        P v1 t2 ==> P v1 t2'
 
-  where " t '=>' t' " := (step t t').
+  where " t '==>' t' " := (step t t').
+
+
+
+Fixpoint test1 (n :nat) : nat :=
+  match n with 
+  | O => if Nat.eqb n n then 1 else 2
+  | _ => n
+  end.
+
 
 Theorem step_deterministic : 
   deterministic step.
@@ -169,8 +181,9 @@ Proof.
     + apply IHHy1 in H4. rewrite H4. reflexivity.
 Qed.
 
+
 Theorem strong_progress : forall t,
-  value t \/ (exists t', t => t').
+  value t \/ (exists t', t ==> t').
 Proof.
   intros t. induction t.
   - left. constructor.
@@ -194,7 +207,7 @@ Lemma nf_is_value : forall t,
   normal_form step t -> value t.
 Proof.
   unfold normal_form. intros. 
-  assert (G : value t \/ exists t', t => t').
+  assert (G : value t \/ exists t', t ==> t').
   { (* Proof of assertion *) apply strong_progress. }
   inversion G.
   - assumption.
@@ -213,20 +226,21 @@ Inductive value : tm -> Prop :=
 | v_funny : forall t1 n2, (* <---- *)
               value (P t1 (C n2)).
 
-Reserved Notation " t '=>' t' " (at level 40).
+Reserved Notation " t '==>' t' " (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_PlusConstConst : forall n1 n2,
-      P (C n1) (C n2) => C (n1 + n2)
+      P (C n1) (C n2) ==> C (n1 + n2)
   | ST_Plus1 : forall t1 t1' t2,
-      t1 => t1' ->
-      P t1 t2 => P t1' t2
+      t1 ==> t1' ->
+      P t1 t2 ==> P t1' t2
   | ST_Plus2 : forall v1 t2 t2',
       value v1 ->
-      t2 => t2' ->
-      P v1 t2 => P v1 t2'
+      t2 ==> t2' ->
+      P v1 t2 ==> P v1 t2'
 
-  where " t '=>' t' " := (step t t').
+  where " t '==>' t' " := (step t t').
+
 
 Lemma value_not_same_as_normal_form :
   exists v, value v /\ ~ normal_form step v.
@@ -243,22 +257,22 @@ Module Temp2.
 Inductive value : tm -> Prop :=
 | v_const : forall n, value (C n).
 
-Reserved Notation " t '=>' t' " (at level 40).
+Reserved Notation " t '==>' t' " (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_Funny : forall n, (* <---- *)
-      C n => P (C n) (C 0)
+      C n ==> P (C n) (C 0)
   | ST_PlusConstConst : forall n1 n2,
-      P (C n1) (C n2) => C (n1 + n2)
+      P (C n1) (C n2) ==> C (n1 + n2)
   | ST_Plus1 : forall t1 t1' t2,
-      t1 => t1' ->
-      P t1 t2 => P t1' t2
+      t1 ==> t1' ->
+      P t1 t2 ==> P t1' t2
   | ST_Plus2 : forall v1 t2 t2',
       value v1 ->
-      t2 => t2' ->
-      P v1 t2 => P v1 t2'
+      t2 ==> t2' ->
+      P v1 t2 ==> P v1 t2'
 
-  where " t '=>' t' " := (step t t').
+  where " t '==>' t' " := (step t t').
 
 Lemma value_not_same_as_normal_form :
   exists v, value v /\ ~ normal_form step v.
@@ -275,16 +289,16 @@ Module Temp3.
 Inductive value : tm ->  Prop :=
   | v_const : forall n, value (C n).
 
-Reserved Notation " t '=>' t' " (at level 40).
+Reserved Notation " t '==>' t' " (at level 40).
 
 Inductive step : tm ->  tm ->  Prop :=
   | ST_PlusConstConst : forall n1 n2,
-      P (C n1) (C n2) => C (n1 + n2)
+      P (C n1) (C n2) ==> C (n1 + n2)
   | ST_Plus1 : forall t1 t1' t2,
-      t1 => t1' -> 
-      P t1 t2 => P t1' t2
+      t1 ==> t1' -> 
+      P t1 t2 ==> P t1' t2
 
-  where " t '=>' t' " := (step t t').
+  where " t '==>' t' " := (step t t').
 
 
 Lemma value_not_same_as_normal_form :
@@ -308,21 +322,21 @@ Inductive value : tm -> Prop :=
   | v_true : value ttrue
   | v_false : value tfalse.
 
-Reserved Notation " t '=>' t' " (at level 40).
+Reserved Notation " t '==>' t' " (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_IfTrue : forall t1 t2,
-      tif ttrue t1 t2 => t1
+      tif ttrue t1 t2 ==> t1
   | ST_IfFalse : forall t1 t2,
-      tif tfalse t1 t2 => t2
+      tif tfalse t1 t2 ==> t2
   | ST_If : forall t1 t1' t2 t3,
-      t1 => t1' ->
-      tif t1 t2 t3 => tif t1' t2 t3
+      t1 ==> t1' ->
+      tif t1 t2 t3 ==> tif t1' t2 t3
 
-  where " t '=>' t' " := (step t t').
+  where " t '==>' t' " := (step t t').
 
 Theorem strong_progress : forall t,
-  value t \/ (exists t', t => t').
+  value t \/ (exists t', t ==> t').
 Proof.
   intros t. induction t.
   - left. constructor.
@@ -354,28 +368,28 @@ Qed.
 
 Module Temp5.
 
-Reserved Notation " t '=>' t' " (at level 40).
+Reserved Notation " t '==>' t' " (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_IfTrue : forall t1 t2,
-      tif ttrue t1 t2 => t1
+      tif ttrue t1 t2 ==> t1
   | ST_IfFalse : forall t1 t2,
-      tif tfalse t1 t2 => t2
+      tif tfalse t1 t2 ==> t2
   | ST_If : forall t1 t1' t2 t3,
-      t1 => t1' ->
-      tif t1 t2 t3 => tif t1' t2 t3
+      t1 ==> t1' ->
+      tif t1 t2 t3 ==> tif t1' t2 t3
   | ST_ShortCircuit : forall t t',
       (t' = ttrue \/ t' = tfalse) ->
-      tif t t' t' => t'
+      tif t t' t' ==> t'
 
-  where " t '=>' t' " := (step t t').
+  where " t '==>' t' " := (step t t').
 
 Definition bool_step_prop4 :=
          tif
             (tif ttrue ttrue ttrue)
             tfalse
             tfalse
-     =>
+     ==>
          tfalse.
 
 Example bool_step_prop4_holds :
@@ -402,7 +416,7 @@ Proof.
 Qed.
 
 Theorem strong_progress : forall t,
-  value t \/ (exists t', t => t').
+  value t \/ (exists t', t ==> t').
 Proof.
   Admitted.
 
@@ -420,7 +434,7 @@ Inductive multi {X:Type} (R: relation X) : relation X :=
                     multi R y z ->
                     multi R x z.
 
-Notation " t '=>*' t' " := (multi step t t') (at level 40).
+Notation " t '==>*' t' " := (multi step t t') (at level 40).
 
 Theorem multi_R : forall (X:Type) (R:relation X) (x y : X),
        R x y -> (multi R) x y.
@@ -444,7 +458,7 @@ Lemma test_multistep_1':
       P
         (P (C 0) (C 3))
         (P (C 2) (C 4))
-  =>*
+  ==>*
       C ((0 + 3) + (2 + 4)).
 Proof.
   eapply multi_step. apply ST_Plus1. apply ST_PlusConstConst.
@@ -459,7 +473,7 @@ Lemma test_multistep_4:
         (P
           (C 2)
           (P (C 0) (C 3)))
-  =>*
+  ==>*
       P
         (C 0)
         (C (2 + (0 + 3))).
@@ -473,7 +487,7 @@ Qed.
 Definition step_normal_form := normal_form step.
 
 Definition normal_form_of (t t' : tm) :=
-  (t =>* t' /\ step_normal_form t').
+  (t ==>* t' /\ step_normal_form t').
 
 Theorem normal_form_unique:
   deterministic normal_form_of.
@@ -500,8 +514,8 @@ Definition normalizing {X:Type} (R:relation X) :=
     (multi R) t t' /\ normal_form R t'.
 
 Lemma multistep_congr_1 : forall t1 t1' t2,
-     t1 =>* t1' ->
-     P t1 t2 =>* P t1' t2.
+     t1 ==>* t1' ->
+     P t1 t2 ==>* P t1' t2.
 Proof.
   intros t1 t1' t2 H. induction H.
     - (* multi_refl *) apply multi_refl.
@@ -511,8 +525,8 @@ Proof.
 
 Lemma multistep_congr_2 : forall t1 t2 t2',
      value t1 ->
-     t2 =>* t2' ->
-     P t1 t2 =>* P t1 t2'.
+     t2 ==>* t2' ->
+     P t1 t2 ==>* P t1 t2'.
 Proof.
   intros. induction H0.
   - constructor.
@@ -535,23 +549,23 @@ Proof.
       rewrite nf_same_as_value in H12. rewrite nf_same_as_value in H22.
       inversion H12 as [n1]. inversion H22 as [n2]. subst.
       exists (C (n1 + n2)). split.
-     + assert (P t1 t2 =>* P (C n1) t2). {  apply multistep_congr_1. assumption. }
-       assert (P (C n1) t2 =>* P (C n1) (C n2)). { apply multistep_congr_2; assumption. }
-       assert (P t1 t2 =>* P (C n1) (C n2)). { apply multi_trans with (P (C n1) t2); assumption. }
-       assert (P (C n1) (C n2) =>* C (n1 + n2)). {  apply multi_step with (C (n1 + n2)); constructor. } 
+     + assert (P t1 t2 ==>* P (C n1) t2). {  apply multistep_congr_1. assumption. }
+       assert (P (C n1) t2 ==>* P (C n1) (C n2)). { apply multistep_congr_2; assumption. }
+       assert (P t1 t2 ==>* P (C n1) (C n2)). { apply multi_trans with (P (C n1) t2); assumption. }
+       assert (P (C n1) (C n2) ==>* C (n1 + n2)). {  apply multi_step with (C (n1 + n2)); constructor. } 
        apply multi_trans with (P (C n1) (C n2)); assumption.
      +  rewrite nf_same_as_value. constructor.
 Qed.
 
 
 Theorem eval__multistep: forall t n,
-  t \\ n -> t =>* C n.
+  t \\ n -> t ==>* C n.
 Proof.
   intros. induction H.
   - constructor.
-  - assert (P t1 t2 =>* P (C n1) t2).  { apply multistep_congr_1. assumption. }
-    assert (P (C n1) t2 =>* P (C n1) (C n2)). { apply multistep_congr_2. constructor. assumption. }
-    assert (P t1 t2 =>* P (C n1) (C n2)). 
+  - assert (P t1 t2 ==>* P (C n1) t2).  { apply multistep_congr_1. assumption. }
+    assert (P (C n1) t2 ==>* P (C n1) (C n2)). { apply multistep_congr_2. constructor. assumption. }
+    assert (P t1 t2 ==>* P (C n1) (C n2)). 
     {
       eapply multi_trans. apply H1. assumption.
     }
@@ -559,7 +573,7 @@ Proof.
 Qed.
 
 Lemma step__eval : forall t t' n,
-  t => t' ->
+  t ==> t' ->
   t' \\ n ->
   t \\ n.
 Proof.
@@ -609,27 +623,27 @@ Inductive value : tm -> Prop :=
   | v_true : value ttrue
   | v_false : value tfalse.
 
-Reserved Notation " t '=>' t' " (at level 40).
+Reserved Notation " t '==>' t' " (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
   | ST_PlusConstConst : forall n1 n2,
-      P (C n1) (C n2) => C (n1 + n2)
+      P (C n1) (C n2) ==> C (n1 + n2)
   | ST_Plus1 : forall t1 t1' t2,
-      t1 => t1' ->
-      P t1 t2 => P t1' t2
+      t1 ==> t1' ->
+      P t1 t2 ==> P t1' t2
   | ST_Plus2 : forall v1 t2 t2',
       value v1 ->
-      t2 => t2' ->
-      P v1 t2 => P v1 t2'
+      t2 ==> t2' ->
+      P v1 t2 ==> P v1 t2'
   | ST_IfTrue : forall t1 t2,
-      tif ttrue t1 t2 => t1
+      tif ttrue t1 t2 ==> t1
   | ST_IfFalse : forall t1 t2,
-      tif tfalse t1 t2 => t2
+      tif tfalse t1 t2 ==> t2
   | ST_If : forall t1 t1' t2 t3,
-      t1 => t1' ->
-      tif t1 t2 t3 => tif t1' t2 t3
+      t1 ==> t1' ->
+      tif t1 t2 t3 ==> tif t1' t2 t3
 
-  where " t '=>' t' " := (step t t').
+  where " t '==>' t' " := (step t t').
 
 Theorem step_deterministic:
   deterministic step.
@@ -646,7 +660,7 @@ Proof.
 Qed.
 
 Theorem not_strong_progress : exists t,
-  ~(value t) /\ ~(exists t', t => t').
+  ~(value t) /\ ~(exists t', t ==> t').
 Proof.
   exists (P (C 0) ttrue). split.
   - unfold not. intros. inversion H.
@@ -660,113 +674,113 @@ End Combined.
 Inductive aval : aexp -> Prop :=
   av_num : forall n, aval (ANum n).
 
-Reserved Notation " t '/' st '=>a' t' " (at level 40, st at level 39).
+Reserved Notation " t '/' st '==>a' t' " (at level 40, st at level 39).
 
 Inductive astep : state -> aexp -> aexp -> Prop :=
   | AS_Id : forall st i,
-      AId i / st =>a ANum (st i)
+      AId i / st ==>a ANum (st i)
   | AS_Plus : forall st n1 n2,
-      APlus (ANum n1) (ANum n2) / st =>a ANum (n1 + n2)
+      APlus (ANum n1) (ANum n2) / st ==>a ANum (n1 + n2)
   | AS_Plus1 : forall st a1 a1' a2,
-      a1 / st =>a a1' ->
-      (APlus a1 a2) / st =>a (APlus a1' a2)
+      a1 / st ==>a a1' ->
+      (APlus a1 a2) / st ==>a (APlus a1' a2)
   | AS_Plus2 : forall st v1 a2 a2',
       aval v1 ->
-      a2 / st =>a a2' ->
-      (APlus v1 a2) / st =>a (APlus v1 a2')
+      a2 / st ==>a a2' ->
+      (APlus v1 a2) / st ==>a (APlus v1 a2')
   | AS_Minus : forall st n1 n2,
-      (AMinus (ANum n1) (ANum n2)) / st =>a (ANum (minus n1 n2))
+      (AMinus (ANum n1) (ANum n2)) / st ==>a (ANum (minus n1 n2))
   | AS_Minus1 : forall st a1 a1' a2,
-      a1 / st =>a a1' ->
-      (AMinus a1 a2) / st =>a (AMinus a1' a2)
+      a1 / st ==>a a1' ->
+      (AMinus a1 a2) / st ==>a (AMinus a1' a2)
   | AS_Minus2 : forall st v1 a2 a2',
       aval v1 ->
-      a2 / st =>a a2' ->
-      (AMinus v1 a2) / st =>a (AMinus v1 a2')
+      a2 / st ==>a a2' ->
+      (AMinus v1 a2) / st ==>a (AMinus v1 a2')
   | AS_Mult : forall st n1 n2,
-      (AMult (ANum n1) (ANum n2)) / st =>a (ANum (mult n1 n2))
+      (AMult (ANum n1) (ANum n2)) / st ==>a (ANum (mult n1 n2))
   | AS_Mult1 : forall st a1 a1' a2,
-      a1 / st =>a a1' ->
-      (AMult (a1) (a2)) / st =>a (AMult (a1') (a2))
+      a1 / st ==>a a1' ->
+      (AMult (a1) (a2)) / st ==>a (AMult (a1') (a2))
   | AS_Mult2 : forall st v1 a2 a2',
       aval v1 ->
-      a2 / st =>a a2' ->
-      (AMult v1 a2) / st =>a (AMult v1 a2')
+      a2 / st ==>a a2' ->
+      (AMult v1 a2) / st ==>a (AMult v1 a2')
 
-    where " t '/' st '=>a' t' " := (astep st t t').
+    where " t '/' st '==>a' t' " := (astep st t t').
 
-  Reserved Notation " t '/' st '=>b' t' " (at level 40, st at level 39).
+  Reserved Notation " t '/' st '==>b' t' " (at level 40, st at level 39).
 
   Inductive bstep : state -> bexp -> bexp -> Prop :=
   | BS_Eq : forall st n1 n2,
-      (BEq (ANum n1) (ANum n2)) / st =>b
+      (BEq (ANum n1) (ANum n2)) / st ==>b
       (if (beq_nat n1 n2) then BTrue else BFalse)
   | BS_Eq1 : forall st a1 a1' a2,
-      a1 / st =>a a1' ->
-      (BEq a1 a2) / st =>b (BEq a1' a2)
+      a1 / st ==>a a1' ->
+      (BEq a1 a2) / st ==>b (BEq a1' a2)
   | BS_Eq2 : forall st v1 a2 a2',
       aval v1 ->
-      a2 / st =>a a2' ->
-      (BEq v1 a2) / st =>b (BEq v1 a2')
+      a2 / st ==>a a2' ->
+      (BEq v1 a2) / st ==>b (BEq v1 a2')
   | BS_LtEq : forall st n1 n2,
-      (BLe (ANum n1) (ANum n2)) / st =>b
+      (BLe (ANum n1) (ANum n2)) / st ==>b
                (if (leb n1 n2) then BTrue else BFalse)
   | BS_LtEq1 : forall st a1 a1' a2,
-      a1 / st =>a a1' ->
-      (BLe a1 a2) / st =>b (BLe a1' a2)
+      a1 / st ==>a a1' ->
+      (BLe a1 a2) / st ==>b (BLe a1' a2)
   | BS_LtEq2 : forall st v1 a2 a2',
       aval v1 ->
-      a2 / st =>a a2' ->
-      (BLe v1 a2) / st =>b (BLe v1 (a2'))
+      a2 / st ==>a a2' ->
+      (BLe v1 a2) / st ==>b (BLe v1 (a2'))
   | BS_NotTrue : forall st,
-      (BNot BTrue) / st =>b BFalse
+      (BNot BTrue) / st ==>b BFalse
   | BS_NotFalse : forall st,
-      (BNot BFalse) / st =>b BTrue
+      (BNot BFalse) / st ==>b BTrue
   | BS_NotStep : forall st b1 b1',
-      b1 / st =>b b1' ->
-      (BNot b1) / st =>b (BNot b1')
+      b1 / st ==>b b1' ->
+      (BNot b1) / st ==>b (BNot b1')
   | BS_AndTrueTrue : forall st,
-      (BAnd BTrue BTrue) / st =>b BTrue
+      (BAnd BTrue BTrue) / st ==>b BTrue
   | BS_AndTrueFalse : forall st,
-      (BAnd BTrue BFalse) / st =>b BFalse
+      (BAnd BTrue BFalse) / st ==>b BFalse
   | BS_AndFalse : forall st b2,
-      (BAnd BFalse b2) / st =>b BFalse
+      (BAnd BFalse b2) / st ==>b BFalse
   | BS_AndTrueStep : forall st b2 b2',
-      b2 / st =>b b2' ->
-      (BAnd BTrue b2) / st =>b (BAnd BTrue b2')
+      b2 / st ==>b b2' ->
+      (BAnd BTrue b2) / st ==>b (BAnd BTrue b2')
   | BS_AndStep : forall st b1 b1' b2,
-      b1 / st =>b b1' ->
-      (BAnd b1 b2) / st =>b (BAnd b1' b2)
+      b1 / st ==>b b1' ->
+      (BAnd b1 b2) / st ==>b (BAnd b1' b2)
 
-  where " t '/' st '=>b' t' " := (bstep st t t').
+  where " t '/' st '==>b' t' " := (bstep st t t').
 
-Reserved Notation " t '/' st '=>' t' '/' st' "
+Reserved Notation " t '/' st '==>' t' '/' st' "
                   (at level 40, st at level 39, t' at level 39).
 
 Inductive cstep : (com * state) -> (com * state) -> Prop :=
   | CS_AssStep : forall st i a a',
-      a / st =>a a' ->
-      (i ::= a) / st => (i ::= a') / st
+      a / st ==>a a' ->
+      (i ::= a) / st ==> (i ::= a') / st
   | CS_Ass : forall st i n,
-      (i ::= (ANum n)) / st => SKIP / (t_update st i n)
+      (i ::= (ANum n)) / st ==> SKIP / (t_update st i n)
   | CS_SeqStep : forall st c1 c1' st' c2,
-      c1 / st => c1' / st' ->
-      (c1 ;; c2) / st => (c1' ;; c2) / st'
+      c1 / st ==> c1' / st' ->
+      (c1 ;; c2) / st ==> (c1' ;; c2) / st'
   | CS_SeqFinish : forall st c2,
-      (SKIP ;; c2) / st => c2 / st
+      (SKIP ;; c2) / st ==> c2 / st
   | CS_IfTrue : forall st c1 c2,
-      IFB BTrue THEN c1 ELSE c2 FI / st => c1 / st
+      IFB BTrue THEN c1 ELSE c2 FI / st ==> c1 / st
   | CS_IfFalse : forall st c1 c2,
-      IFB BFalse THEN c1 ELSE c2 FI / st => c2 / st
+      IFB BFalse THEN c1 ELSE c2 FI / st ==> c2 / st
   | CS_IfStep : forall st b b' c1 c2,
-      b / st =>b b' ->
+      b / st ==>b b' ->
           IFB b THEN c1 ELSE c2 FI / st 
-      => (IFB b' THEN c1 ELSE c2 FI) / st
+      ==> (IFB b' THEN c1 ELSE c2 FI) / st
   | CS_While : forall st b c1,
           (WHILE b DO c1 END) / st
-      => (IFB b THEN (c1;; (WHILE b DO c1 END)) ELSE SKIP FI) / st
+      ==> (IFB b THEN (c1;; (WHILE b DO c1 END)) ELSE SKIP FI) / st
 
-  where " t '/' st '=>' t' '/' st' " := (cstep (t,st) (t',st')).
+  where " t '/' st '==>' t' '/' st' " := (cstep (t,st) (t',st')).
 
 
 Module CImp.
@@ -796,40 +810,40 @@ Notation "'PAR' c1 'WITH' c2 'END'" :=
 Inductive cstep : (com * state) -> (com * state) -> Prop :=
     (* Old part *)
   | CS_AssStep : forall st i a a',
-      a / st =>a a' ->
-      (i ::= a) / st => (i ::= a') / st
+      a / st ==>a a' ->
+      (i ::= a) / st ==> (i ::= a') / st
   | CS_Ass : forall st i n,
-      (i ::= (ANum n)) / st => SKIP / (t_update st i n)
+      (i ::= (ANum n)) / st ==> SKIP / (t_update st i n)
   | CS_SeqStep : forall st c1 c1' st' c2,
-      c1 / st => c1' / st' ->
-      (c1 ;; c2) / st => (c1' ;; c2) / st'
+      c1 / st ==> c1' / st' ->
+      (c1 ;; c2) / st ==> (c1' ;; c2) / st'
   | CS_SeqFinish : forall st c2,
-      (SKIP ;; c2) / st => c2 / st
+      (SKIP ;; c2) / st ==> c2 / st
   | CS_IfTrue : forall st c1 c2,
-      (IFB BTrue THEN c1 ELSE c2 FI) / st => c1 / st
+      (IFB BTrue THEN c1 ELSE c2 FI) / st ==> c1 / st
   | CS_IfFalse : forall st c1 c2,
-      (IFB BFalse THEN c1 ELSE c2 FI) / st => c2 / st
+      (IFB BFalse THEN c1 ELSE c2 FI) / st ==> c2 / st
   | CS_IfStep : forall st b b' c1 c2,
-      b /st =>b b' ->
+      b /st ==>b b' ->
           (IFB b THEN c1 ELSE c2 FI) / st 
-      => (IFB b' THEN c1 ELSE c2 FI) / st
+      ==> (IFB b' THEN c1 ELSE c2 FI) / st
   | CS_While : forall st b c1,
           (WHILE b DO c1 END) / st 
-      => (IFB b THEN (c1;; (WHILE b DO c1 END)) ELSE SKIP FI) / st
+      ==> (IFB b THEN (c1;; (WHILE b DO c1 END)) ELSE SKIP FI) / st
     (* New part: *)
   | CS_Par1 : forall st c1 c1' c2 st',
-      c1 / st => c1' / st' ->
-      (PAR c1 WITH c2 END) / st => (PAR c1' WITH c2 END) / st'
+      c1 / st ==> c1' / st' ->
+      (PAR c1 WITH c2 END) / st ==> (PAR c1' WITH c2 END) / st'
   | CS_Par2 : forall st c1 c2 c2' st',
-      c2 / st => c2' / st' ->
-      (PAR c1 WITH c2 END) / st => (PAR c1 WITH c2' END) / st'
+      c2 / st ==> c2' / st' ->
+      (PAR c1 WITH c2 END) / st ==> (PAR c1 WITH c2' END) / st'
   | CS_ParDone : forall st,
-      (PAR SKIP WITH SKIP END) / st => SKIP / st
-  where " t '/' st '=>' t' '/' st' " := (cstep (t,st) (t',st')).
+      (PAR SKIP WITH SKIP END) / st ==> SKIP / st
+  where " t '/' st '==>' t' '/' st' " := (cstep (t,st) (t',st')).
 
 Definition cmultistep := multi cstep.
 
-Notation " t '/' st '=>*' t' '/' st' " :=
+Notation " t '/' st '==>*' t' '/' st' " :=
    (multi cstep (t,st) (t',st'))
    (at level 40, st at level 39, t' at level 39).
 
@@ -844,7 +858,7 @@ Definition par_loop : com :=
 
 Example par_loop_example_0:
   exists st',
-       par_loop / empty_state =>* SKIP / st'
+       par_loop / empty_state ==>* SKIP / st'
     /\ st' X = 0.
 Proof.
   eapply ex_intro. split.
