@@ -89,3 +89,48 @@ Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
   end
 
 where "'[' x ':=' s ']' t" := (subst x s t).
+
+Inductive substi (s:tm) (x:id) : tm -> tm -> Prop :=
+  | s_var1 :
+    substi s x (tvar x) s
+  | s_var2 : forall (y: id), 
+    x <> y -> substi s x (tvar y) (tvar y)
+  | s_abs1 : forall T t1,
+    substi s x (tabs x T t1) (tabs x T t1)
+  | s_abs2 : forall y T t1 t2,
+    x <> y -> 
+    substi s x t1 t2 ->
+    substi s x (tabs y T t1) (tabs y T t2)
+  | s_tapp : forall t1 t1' t2 t2',
+    substi s x t1 t1' ->
+    substi s x t2 t2' ->
+    substi s x (tapp t1 t2) (tapp t1' t2')
+  | s_ttrue :
+    substi s x ttrue ttrue
+  | s_ttfalse :
+    substi s x tfalse tfalse
+  | s_tif : forall t1 t1' t2 t2' t3 t3',
+    substi s x t1 t1' ->
+    substi s x t2 t2' ->
+    substi s x t3 t3' ->
+    substi s x (tif t1 t2 t3) (tif t1' t2' t3').
+
+Hint Constructors substi.
+Hint Resolve beq_id_true_iff.
+Hint Resolve beq_id_false_iff.
+Hint Resolve beq_id_refl.
+
+Theorem substi_correct : forall s x t t',
+  [x:=s]t = t' <-> substi s x t t'.
+Proof with auto.
+  split.
+  - intros. generalize dependent t'. induction t; intros t' H; simpl in H; subst; auto.
+    + destruct (beq_id x0 i) eqn:Heq.
+      * apply beq_id_true_iff in Heq. subst. auto.
+      * apply beq_id_false_iff in Heq. subst. auto.
+    + destruct (beq_id x0 i) eqn:Heq.
+      * apply beq_id_true_iff in Heq. subst. auto.
+      * apply beq_id_false_iff in Heq. subst. auto.
+  - intros H. induction H; simpl; try (rewrite <- beq_id_refl); 
+    try (apply beq_id_false_iff in H; rewrite H); subst; auto.
+Qed.
