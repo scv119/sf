@@ -26,3 +26,15 @@ Proof.
   inversion HVal; intros; subst; try inversion HT; subst; auto.
   exists x0. exists t0. auto.
 Qed.
+
+
+Theorem progress : forall t T,
+     empty |- t \in T ->
+     value t \/ exists t', t ==> t'.
+Proof with eauto.
+  intros t T Ht.
+  remember (@empty ty) as Gamma.
+  induction Ht...
+  + subst. inversion H.
+  +
+
